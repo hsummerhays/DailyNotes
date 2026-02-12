@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: dailynotes-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: DailyNotes
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dailynotes-api
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=DailyNotes;Username=postgres;Password=password
+      - ASPNETCORE_ENVIRONMENT=Development
+    ports:
+      - "5000:8080"
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:

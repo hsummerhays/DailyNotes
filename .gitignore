@@ -1,0 +1,21 @@
+# .NET
+bin/
+obj/
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Node
+node_modules/
+dist/
+build/
+.env
+.env.local
+
+# Docker
+docker-compose.override.yml
+
+# OS
+.DS_Store
+Thumbs.db
