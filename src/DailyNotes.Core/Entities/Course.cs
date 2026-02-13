@@ -10,6 +10,7 @@ namespace DailyNotes.Core.Entities
         public string UserId { get; set; } = string.Empty;
         public string Semester { get; set; } = string.Empty; // e.g., "Fall 2024"
         public string Name { get; set; } = string.Empty;     // e.g., "CS 101"
+        public string? Instructor { get; set; }
         public string Description { get; set; } = string.Empty;
         public int Credits { get; set; } = 3;
 

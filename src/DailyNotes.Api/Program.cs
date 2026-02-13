@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Net;
 using DailyNotes.Core.Interfaces;
 using DailyNotes.Infrastructure.Services;
 
@@ -52,12 +53,46 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
+// CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowDevClient", policy =>
+        policy.WithOrigins("http://localhost:5173", "http://localhost:4200")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials());
+});
+
 // Services
 builder.Services.AddScoped<IAuthService, AuthService>();
 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
+
+// Global error handling
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+        context.Response.ContentType = "application/json";
+
+        var error = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+        if (error != null)
+        {
+            var env = context.RequestServices.GetRequiredService<IHostEnvironment>();
+            var response = env.IsDevelopment()
+                ? new { message = error.Error.Message, detail = error.Error.StackTrace }
+                : new { message = "An unexpected error occurred.", detail = (string?)null };
+
+            await context.Response.WriteAsJsonAsync(response);
+        }
+    });
+});
+
+app.UseCors("AllowDevClient");
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

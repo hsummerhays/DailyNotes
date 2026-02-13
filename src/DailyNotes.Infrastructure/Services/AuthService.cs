@@ -72,7 +72,7 @@ namespace DailyNotes.Infrastructure.Services
             await _context.SaveChangesAsync();
 
             // 4. Generate Token
-            return GenerateAuthResponse(user, tenant.Id, "owner");
+            return await GenerateAuthResponse(user, tenant.Id, "owner");
         }
 
         public async Task<AuthResponseDto> LoginAsync(LoginDto model)
@@ -93,10 +93,40 @@ namespace DailyNotes.Infrastructure.Services
                 throw new Exception("User is not associated with any tenant.");
 
             // 3. Generate Token
-            return GenerateAuthResponse(user, tenantUser.TenantId, tenantUser.Role);
+            return await GenerateAuthResponse(user, tenantUser.TenantId, tenantUser.Role);
         }
 
-        private AuthResponseDto GenerateAuthResponse(IdentityUser user, int tenantId, string role)
+        public async Task<AuthResponseDto> RefreshTokenAsync(string refreshToken)
+        {
+            // Find user by stored refresh token
+            var users = _userManager.Users.ToList();
+            IdentityUser? foundUser = null;
+
+            foreach (var u in users)
+            {
+                var storedToken = await _userManager.GetAuthenticationTokenAsync(u, "DailyNotes", "RefreshToken");
+                if (storedToken == refreshToken)
+                {
+                    foundUser = u;
+                    break;
+                }
+            }
+
+            if (foundUser == null)
+                throw new Exception("Invalid refresh token.");
+
+            // Get tenant
+            var tenantUser = await _context.TenantUsers
+                .FirstOrDefaultAsync(tu => tu.UserId == foundUser.Id);
+
+            if (tenantUser == null)
+                throw new Exception("User is not associated with any tenant.");
+
+            // Generate new tokens
+            return await GenerateAuthResponse(foundUser, tenantUser.TenantId, tenantUser.Role);
+        }
+
+        private async Task<AuthResponseDto> GenerateAuthResponse(IdentityUser user, int tenantId, string role)
         {
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"] ?? throw new Exception("JWT Key not configured")));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -119,9 +149,14 @@ namespace DailyNotes.Infrastructure.Services
                 signingCredentials: creds
             );
 
+            // Generate and store refresh token
+            var refreshToken = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(64));
+            await _userManager.SetAuthenticationTokenAsync(user, "DailyNotes", "RefreshToken", refreshToken);
+
             return new AuthResponseDto
             {
                 Token = new JwtSecurityTokenHandler().WriteToken(token),
+                RefreshToken = refreshToken,
                 Expiration = expiry,
                 TenantId = tenantId.ToString(),
                 Role = role

@@ -9,10 +9,14 @@ namespace DailyNotes.Core.Entities
         public int TenantId { get; set; }
         public string UserId { get; set; } = string.Empty;
         public string Visibility { get; set; } = "private";
-        public int WorkDayId { get; set; }
-        public int? TaskId { get; set; }
+        public int? WorkTaskId { get; set; }
+        public DateTime NoteDate { get; set; }
         public JsonDocument Content { get; set; } = JsonDocument.Parse("{}");
         public int TimeMinutes { get; set; } = 0;
+
+        // External integration
+        public string? ExternalSource { get; set; }
+        public string? ExternalId { get; set; }
 
         public bool IsPinned { get; set; } = false;
 

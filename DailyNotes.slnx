@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/DailyNotes.Api/DailyNotes.Api.csproj" />
     <Project Path="src/DailyNotes.Core/DailyNotes.Core.csproj" />
+    <Project Path="src/DailyNotes.Import/DailyNotes.Import.csproj" />
     <Project Path="src/DailyNotes.Infrastructure/DailyNotes.Infrastructure.csproj" />
   </Folder>
 </Solution>

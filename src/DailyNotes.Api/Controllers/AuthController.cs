@@ -43,5 +43,24 @@ namespace DailyNotes.Api.Controllers
                 return Unauthorized(new { message = ex.Message });
             }
         }
+
+        [HttpPost("refresh")]
+        public async Task<IActionResult> Refresh([FromBody] RefreshTokenRequest model)
+        {
+            try
+            {
+                var response = await _authService.RefreshTokenAsync(model.RefreshToken);
+                return Ok(response);
+            }
+            catch (System.Exception ex)
+            {
+                return Unauthorized(new { message = ex.Message });
+            }
+        }
+    }
+
+    public class RefreshTokenRequest
+    {
+        public string RefreshToken { get; set; } = string.Empty;
     }
 }

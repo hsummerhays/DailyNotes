@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -13,6 +14,26 @@ namespace DailyNotes.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.CreateTable(
+                name: "api_keys",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    TenantId = table.Column<int>(type: "integer", nullable: false),
+                    UserId = table.Column<string>(type: "text", nullable: false),
+                    Name = table.Column<string>(type: "text", nullable: false),
+                    KeyHash = table.Column<string>(type: "text", nullable: false),
+                    Scopes = table.Column<List<string>>(type: "text[]", nullable: false),
+                    IsActive = table.Column<bool>(type: "boolean", nullable: false),
+                    LastUsedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_api_keys", x => x.Id);
+                });
+
             migrationBuilder.CreateTable(
                 name: "asp_net_roles",
                 columns: table => new
@@ -88,6 +109,7 @@ namespace DailyNotes.Infrastructure.Migrations
                     UserId = table.Column<string>(type: "text", nullable: false),
                     Semester = table.Column<string>(type: "text", nullable: false),
                     Name = table.Column<string>(type: "text", nullable: false),
+                    Instructor = table.Column<string>(type: "text", nullable: true),
                     Description = table.Column<string>(type: "text", nullable: false),
                     Credits = table.Column<int>(type: "integer", nullable: false),
                     TargetGrade = table.Column<decimal>(type: "numeric", nullable: true),
@@ -104,6 +126,25 @@ namespace DailyNotes.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_courses", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "integration_connections",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    TenantId = table.Column<int>(type: "integer", nullable: false),
+                    Provider = table.Column<string>(type: "text", nullable: false),
+                    BaseUrl = table.Column<string>(type: "text", nullable: true),
+                    EncryptedCredentials = table.Column<string>(type: "text", nullable: true),
+                    IsActive = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_integration_connections", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -127,7 +168,10 @@ namespace DailyNotes.Infrastructure.Migrations
                     Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     TenantId = table.Column<int>(type: "integer", nullable: false),
-                    PeriodEndDate = table.Column<DateOnly>(type: "date", nullable: false)
+                    UserId = table.Column<string>(type: "text", nullable: false),
+                    PeriodStartDate = table.Column<DateOnly>(type: "date", nullable: false),
+                    PeriodEndDate = table.Column<DateOnly>(type: "date", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -268,7 +312,7 @@ namespace DailyNotes.Infrastructure.Migrations
                     Visibility = table.Column<string>(type: "text", nullable: false),
                     ParentTopicId = table.Column<int>(type: "integer", nullable: true),
                     Title = table.Column<string>(type: "text", nullable: false),
-                    Description = table.Column<string>(type: "text", nullable: false),
+                    Description = table.Column<string>(type: "text", nullable: true),
                     Proficiency = table.Column<string>(type: "text", nullable: false),
                     SkillLevel = table.Column<int>(type: "integer", nullable: false),
                     IsPinned = table.Column<bool>(type: "boolean", nullable: false),
@@ -281,6 +325,42 @@ namespace DailyNotes.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "webhook_events",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    TenantId = table.Column<int>(type: "integer", nullable: false),
+                    Provider = table.Column<string>(type: "text", nullable: false),
+                    EventType = table.Column<string>(type: "text", nullable: false),
+                    Payload = table.Column<JsonDocument>(type: "jsonb", nullable: false),
+                    Processed = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_webhook_events", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "webhook_subscriptions",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    TenantId = table.Column<int>(type: "integer", nullable: false),
+                    Url = table.Column<string>(type: "text", nullable: false),
+                    Events = table.Column<List<string>>(type: "text[]", nullable: false),
+                    Secret = table.Column<string>(type: "text", nullable: false),
+                    IsActive = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_webhook_subscriptions", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "work_days",
                 columns: table => new
                 {
@@ -288,7 +368,7 @@ namespace DailyNotes.Infrastructure.Migrations
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     TenantId = table.Column<int>(type: "integer", nullable: false),
                     UserId = table.Column<string>(type: "text", nullable: false),
-                    Date = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    WorkDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     TimeIn1 = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     TimeOut1 = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     TimeIn2 = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
@@ -296,6 +376,7 @@ namespace DailyNotes.Infrastructure.Migrations
                     TimeIn3 = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     TimeOut3 = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     BreakMinutes = table.Column<int>(type: "integer", nullable: false),
+                    Comments = table.Column<string>(type: "text", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
@@ -315,6 +396,7 @@ namespace DailyNotes.Infrastructure.Migrations
                     Visibility = table.Column<string>(type: "text", nullable: false),
                     Name = table.Column<string>(type: "text", nullable: false),
                     Status = table.Column<string>(type: "text", nullable: false),
+                    StartDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     DueDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     ProjectId = table.Column<int>(type: "integer", nullable: true),
                     ParentTaskId = table.Column<int>(type: "integer", nullable: true),
@@ -441,15 +523,17 @@ namespace DailyNotes.Infrastructure.Migrations
                 {
                     Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    TenantId = table.Column<int>(type: "integer", nullable: false),
                     CourseId = table.Column<int>(type: "integer", nullable: false),
-                    Name = table.Column<string>(type: "text", nullable: false),
-                    Description = table.Column<string>(type: "text", nullable: false),
+                    TenantId = table.Column<int>(type: "integer", nullable: false),
+                    UserId = table.Column<string>(type: "text", nullable: false),
+                    Title = table.Column<string>(type: "text", nullable: false),
+                    Description = table.Column<string>(type: "text", nullable: true),
                     DueDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     Status = table.Column<string>(type: "text", nullable: false),
-                    Points = table.Column<decimal>(type: "numeric", nullable: true),
-                    MaxPoints = table.Column<decimal>(type: "numeric", nullable: true),
+                    Grade = table.Column<decimal>(type: "numeric", nullable: true),
+                    MaxGrade = table.Column<decimal>(type: "numeric", nullable: true),
                     Weight = table.Column<decimal>(type: "numeric", nullable: true),
+                    TopicId = table.Column<int>(type: "integer", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
@@ -536,13 +620,16 @@ namespace DailyNotes.Infrastructure.Migrations
                     TenantId = table.Column<int>(type: "integer", nullable: false),
                     UserId = table.Column<string>(type: "text", nullable: false),
                     Visibility = table.Column<string>(type: "text", nullable: false),
-                    WorkDayId = table.Column<int>(type: "integer", nullable: false),
-                    TaskId = table.Column<int>(type: "integer", nullable: true),
+                    WorkTaskId = table.Column<int>(type: "integer", nullable: true),
+                    NoteDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     Content = table.Column<JsonDocument>(type: "jsonb", nullable: false),
                     TimeMinutes = table.Column<int>(type: "integer", nullable: false),
+                    ExternalSource = table.Column<string>(type: "text", nullable: true),
+                    ExternalId = table.Column<string>(type: "text", nullable: true),
                     IsPinned = table.Column<bool>(type: "boolean", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    WorkDayId = table.Column<int>(type: "integer", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -551,8 +638,7 @@ namespace DailyNotes.Infrastructure.Migrations
                         name: "FK_work_notes_work_days_WorkDayId",
                         column: x => x.WorkDayId,
                         principalTable: "work_days",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -630,6 +716,12 @@ namespace DailyNotes.Infrastructure.Migrations
                 column: "TenantId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_integration_connections_TenantId_Provider",
+                table: "integration_connections",
+                columns: new[] { "TenantId", "Provider" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_projects_TenantId",
                 table: "projects",
                 column: "TenantId");
@@ -685,6 +777,9 @@ namespace DailyNotes.Infrastructure.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
+                name: "api_keys");
+
+            migrationBuilder.DropTable(
                 name: "asp_net_role_claims");
 
             migrationBuilder.DropTable(
@@ -704,6 +799,9 @@ namespace DailyNotes.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "attachments");
+
+            migrationBuilder.DropTable(
+                name: "integration_connections");
 
             migrationBuilder.DropTable(
                 name: "item_tags");
@@ -734,6 +832,12 @@ namespace DailyNotes.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "topics");
+
+            migrationBuilder.DropTable(
+                name: "webhook_events");
+
+            migrationBuilder.DropTable(
+                name: "webhook_subscriptions");
 
             migrationBuilder.DropTable(
                 name: "work_notes");

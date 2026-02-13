@@ -32,6 +32,10 @@ namespace DailyNotes.Infrastructure.Data
         public DbSet<QuizOption> QuizOptions { get; set; } = null!;
         public DbSet<QuizAttempt> QuizAttempts { get; set; } = null!;
         public DbSet<QuizAnswer> QuizAnswers { get; set; } = null!;
+        public DbSet<IntegrationConnection> IntegrationConnections { get; set; } = null!;
+        public DbSet<WebhookEvent> WebhookEvents { get; set; } = null!;
+        public DbSet<ApiKey> ApiKeys { get; set; } = null!;
+        public DbSet<WebhookSubscription> WebhookSubscriptions { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -126,6 +130,21 @@ namespace DailyNotes.Infrastructure.Data
             builder.Entity<TopicNote>().HasIndex(tn => tn.TopicId);
             builder.Entity<Course>().HasIndex(c => c.TenantId);
             builder.Entity<Assignment>().HasIndex(a => a.CourseId);
+
+            // Integration entities
+            builder.Entity<IntegrationConnection>().ToTable("integration_connections");
+            builder.Entity<IntegrationConnection>()
+                .HasIndex(ic => new { ic.TenantId, ic.Provider })
+                .IsUnique();
+
+            builder.Entity<WebhookEvent>().ToTable("webhook_events");
+            builder.Entity<WebhookEvent>()
+                .Property(e => e.Payload)
+                .HasColumnType("jsonb");
+
+            builder.Entity<ApiKey>().ToTable("api_keys");
+
+            builder.Entity<WebhookSubscription>().ToTable("webhook_subscriptions");
         }
     }
 }

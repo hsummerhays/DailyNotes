@@ -7,6 +7,6 @@ namespace DailyNotes.Core.Interfaces
     {
         Task<AuthResponseDto> RegisterAsync(RegisterDto model);
         Task<AuthResponseDto> LoginAsync(LoginDto model);
-        // Task<AuthResponseDto> RefreshTokenAsync(string token, string refreshToken); // Build later
+        Task<AuthResponseDto> RefreshTokenAsync(string refreshToken);
     }
 }

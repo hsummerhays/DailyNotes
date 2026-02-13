@@ -10,7 +10,7 @@ namespace DailyNotes.Core.Entities
         public string Visibility { get; set; } = "private";
         public int? ParentTopicId { get; set; }
         public string Title { get; set; } = string.Empty;
-        public string Description { get; set; } = string.Empty;
+        public string? Description { get; set; }
 
         // 'beginner' | 'novice' | 'intermediate' | 'advanced' | 'expert'
         public string Proficiency { get; set; } = "learning";
