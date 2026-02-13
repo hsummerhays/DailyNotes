@@ -30,7 +30,7 @@ namespace DailyNotes.Core.DTOs.Auth
         public string Token { get; set; } = string.Empty;
         public string RefreshToken { get; set; } = string.Empty;
         public DateTime Expiration { get; set; }
-        public string TenantId { get; set; }
-        public string Role { get; set; }
+        public string TenantId { get; set; } = string.Empty;
+        public string Role { get; set; } = string.Empty;
     }
 }
