@@ -74,7 +74,41 @@ else
 }
 
 int tenantId = tenant.Id;
-string userId = "import-user";
+// ── Get or Create User ───────────────────────────────────────────
+string userEmail = "hsummerhays1@gmail.com";
+var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
+var user = await userManager.FindByEmailAsync(userEmail);
+
+if (user == null)
+{
+    user = new IdentityUser { UserName = userEmail, Email = userEmail, EmailConfirmed = true };
+    var result = await userManager.CreateAsync(user, "REPLACED_PASSWORD");
+    if (!result.Succeeded)
+    {
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine($"Error creating user {userEmail}: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+        Console.ResetColor();
+        return 1;
+    }
+    Console.WriteLine($"✓ Created user: \"{user.Email}\" (ID: {user.Id})");
+}
+else
+{
+    Console.WriteLine($"✓ Using existing user: \"{user.Email}\" (ID: {user.Id})");
+}
+
+// Ensure TenantUser link exists
+var tenantUser = await db.TenantUsers.FirstOrDefaultAsync(tu => tu.TenantId == tenant.Id && tu.UserId == user.Id);
+if (tenantUser == null)
+{
+    tenantUser = new TenantUser { TenantId = tenant.Id, UserId = user.Id, Role = "owner", CreatedAt = DateTime.UtcNow };
+    db.TenantUsers.Add(tenantUser);
+    await db.SaveChangesAsync();
+    Console.WriteLine($"✓ Linked user to tenant \"{tenant.Name}\"");
+}
+
+string userId = user.Id;
+
 
 // ── Helper: Safe date parsing ────────────────────────────────────
 DateTime? ParseDate(string? value)
