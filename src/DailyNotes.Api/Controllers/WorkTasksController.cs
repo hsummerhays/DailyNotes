@@ -35,11 +35,9 @@ namespace DailyNotes.Api.Controllers
             return await query.OrderByDescending(t => t.CreatedAt).ToListAsync();
         }
 
-        /// <summary>GET /api/work-tasks/overdue</summary>
-        [HttpGet("overdue")]
         public async Task<ActionResult<IEnumerable<WorkTask>>> GetOverdue()
         {
-            var now = DateTime.UtcNow;
+            var now = DateOnly.FromDateTime(DateTime.UtcNow);
             return await _context.WorkTasks
                 .Where(t => t.DueDate.HasValue && t.DueDate < now && t.Status != "completed")
                 .OrderBy(t => t.DueDate)

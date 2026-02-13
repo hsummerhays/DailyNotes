@@ -10,7 +10,7 @@ namespace DailyNotes.Core.Entities
         public string UserId { get; set; } = string.Empty;
         public string Visibility { get; set; } = "private";
         public int? WorkTaskId { get; set; }
-        public DateTime NoteDate { get; set; }
+        public DateOnly NoteDate { get; set; }
         public JsonDocument Content { get; set; } = JsonDocument.Parse("{}");
         public int TimeMinutes { get; set; } = 0;
 
@@ -22,5 +22,8 @@ namespace DailyNotes.Core.Entities
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+        // Navigation property
+        public WorkDay? WorkDay { get; set; }
     }
 }

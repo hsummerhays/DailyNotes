@@ -37,9 +37,15 @@ namespace DailyNotes.Api.Controllers
                 var notesQuery = _context.WorkNotes.AsQueryable();
 
                 if (dateFrom.HasValue)
-                    notesQuery = notesQuery.Where(n => n.NoteDate >= dateFrom.Value);
+                {
+                    var dFrom = DateOnly.FromDateTime(dateFrom.Value);
+                    notesQuery = notesQuery.Where(n => n.NoteDate >= dFrom);
+                }
                 if (dateTo.HasValue)
-                    notesQuery = notesQuery.Where(n => n.NoteDate <= dateTo.Value);
+                {
+                    var dTo = DateOnly.FromDateTime(dateTo.Value);
+                    notesQuery = notesQuery.Where(n => n.NoteDate <= dTo);
+                }
 
                 // Basic text search on serialized content
                 var notes = await notesQuery

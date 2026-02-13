@@ -21,20 +21,36 @@ namespace DailyNotes.Api.Controllers
         /// <summary>GET /api/work-days?date=2025-01-15&from=&to=</summary>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<WorkDay>>> GetAll(
-            [FromQuery] DateTime? date,
-            [FromQuery] DateTime? from,
-            [FromQuery] DateTime? to)
+            [FromQuery] DateOnly? date,
+            [FromQuery] DateOnly? from,
+            [FromQuery] DateOnly? to,
+            [FromQuery] bool all = false)
         {
             var query = _context.WorkDays.AsQueryable();
 
-            if (date.HasValue)
-                query = query.Where(w => w.WorkDate.Date == date.Value.Date);
-
-            if (from.HasValue)
-                query = query.Where(w => w.WorkDate >= from.Value);
-
-            if (to.HasValue)
-                query = query.Where(w => w.WorkDate <= to.Value);
+            if (all)
+            {
+                // if 'all' is true, return everything, ignore other date filters
+            }
+            else if (date.HasValue)
+            {
+                query = query.Where(w => w.WorkDate == date.Value);
+            }
+            else if (from.HasValue || to.HasValue)
+            {
+                if (from.HasValue)
+                    query = query.Where(w => w.WorkDate >= from.Value);
+                if (to.HasValue)
+                    query = query.Where(w => w.WorkDate <= to.Value);
+            }
+            else
+            {
+                // Default behavior: filter by current month
+                var now = DateOnly.FromDateTime(DateTime.UtcNow);
+                var startDate = new DateOnly(now.Year, now.Month, 1);
+                var endDate = startDate.AddMonths(1).AddDays(-1);
+                query = query.Where(w => w.WorkDate >= startDate && w.WorkDate <= endDate);
+            }
 
             return await query.OrderByDescending(w => w.WorkDate).ToListAsync();
         }
@@ -43,10 +59,10 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("today")]
         public async Task<ActionResult<WorkDay>> GetToday()
         {
-            var today = DateTime.UtcNow.Date;
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
             var workDay = await _context.WorkDays
                 .Include(w => w.Notes)
-                .FirstOrDefaultAsync(w => w.WorkDate.Date == today);
+                .FirstOrDefaultAsync(w => w.WorkDate == today);
 
             if (workDay == null)
                 return NotFound(new { message = "No work day entry for today." });

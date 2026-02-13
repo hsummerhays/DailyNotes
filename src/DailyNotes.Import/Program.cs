@@ -17,7 +17,7 @@ using Microsoft.Extensions.DependencyInjection;
 // Usage: dotnet run --project src/DailyNotes.Import -- --csv-dir ./data
 // ───────────────────────────────────────────────────────────────────
 
-string csvDir = "./data";
+string csvDir = "./dataImport";
 
 // Parse --csv-dir argument
 for (int i = 0; i < args.Length - 1; i++)
@@ -58,6 +58,16 @@ var db = scope.ServiceProvider.GetRequiredService<DailyNotesDbContext>();
 
 // Ensure database + migrations
 await db.Database.MigrateAsync();
+
+// ── Clear existing data (optional, for idempotency in this dev tool) ─────────────
+Console.WriteLine("Clearing existing data...");
+db.WorkNotes.RemoveRange(db.WorkNotes);
+db.WorkTasks.RemoveRange(db.WorkTasks);
+db.WorkDays.RemoveRange(db.WorkDays);
+db.Projects.RemoveRange(db.Projects);
+db.PayPeriods.RemoveRange(db.PayPeriods);
+await db.SaveChangesAsync();
+Console.WriteLine("✓ Data cleared.");
 
 // ── Create default tenant & user ─────────────────────────────────
 var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Name == "Imported");
@@ -111,18 +121,24 @@ string userId = user.Id;
 
 
 // ── Helper: Safe date parsing ────────────────────────────────────
-DateTime? ParseDate(string? value)
+// ── Helper: Safe date parsing ────────────────────────────────────
+DateTime? ParseDate(string? value, string fieldName = "Date")
 {
     if (string.IsNullOrWhiteSpace(value)) return null;
+
+    // Try standard formats first
     if (DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
         return DateTime.SpecifyKind(dt, DateTimeKind.Utc);
-    return null;
-}
 
-decimal? ParseDecimal(string? value)
-{
-    if (string.IsNullOrWhiteSpace(value)) return null;
-    return decimal.TryParse(value, CultureInfo.InvariantCulture, out var d) ? d : null;
+    // fallback to US format explicitly if needed
+    if (DateTime.TryParseExact(value, ["M/d/yyyy", "M/d/yy", "MM/dd/yyyy", "MM/dd/yy", "yyyy-MM-dd", "d/M/yyyy", "dd/MM/yyyy"],
+        CultureInfo.InvariantCulture, DateTimeStyles.None, out dt))
+        return DateTime.SpecifyKind(dt, DateTimeKind.Utc);
+
+    Console.ForegroundColor = ConsoleColor.DarkYellow;
+    Console.WriteLine($"  [!] Failed to parse date '{value}' for field '{fieldName}'");
+    Console.ResetColor();
+    return null;
 }
 
 int? ParseInt(string? value)
@@ -157,8 +173,8 @@ if (File.Exists(projectsFile))
     foreach (var row in records)
     {
         var dict = (IDictionary<string, object>)row;
-        var createdDateParsed = ParseDate(dict.ContainsKey("CreatedDate") ? dict["CreatedDate"]?.ToString() : null);
-        var completedDateParsed = ParseDate(dict.ContainsKey("CompletedDate") ? dict["CompletedDate"]?.ToString() : null);
+        var createdDateParsed = ParseDate(dict.ContainsKey("CreatedDate") ? dict["CreatedDate"]?.ToString() : null, "CreatedDate");
+        var completedDateParsed = ParseDate(dict.ContainsKey("CompletedDate") ? dict["CompletedDate"]?.ToString() : null, "CompletedDate");
         var project = new Project
         {
             TenantId = tenantId,
@@ -204,8 +220,17 @@ if (File.Exists(tasksFile))
                                dict.ContainsKey("ProjectID") ? dict["ProjectID"]?.ToString() : null;
 
         int? projectId = null;
-        if (!string.IsNullOrEmpty(fmProjectId) && projectIdMap.TryGetValue(fmProjectId, out var mappedId))
-            projectId = mappedId;
+        if (!string.IsNullOrEmpty(fmProjectId))
+        {
+            if (projectIdMap.TryGetValue(fmProjectId, out var mappedId))
+                projectId = mappedId;
+            else
+                Console.WriteLine($"  [!] Project ID '{fmProjectId}' not found for task '{dict["Name"]?.ToString()}'");
+        }
+
+        var startDateVal = ParseDate(dict.ContainsKey("StartDate") ? dict["StartDate"]?.ToString() : null, "StartDate");
+        var dueDateVal = ParseDate(dict.ContainsKey("DueDate") ? dict["DueDate"]?.ToString() :
+                                dict.ContainsKey("Due Date") ? dict["Due Date"]?.ToString() : null, "DueDate");
 
         var task = new WorkTask
         {
@@ -215,9 +240,9 @@ if (File.Exists(tasksFile))
             Name = dict.ContainsKey("Name") ? dict["Name"]?.ToString() ?? "" :
                    dict.ContainsKey("Task Name") ? dict["Task Name"]?.ToString() ?? "" : "",
             Status = dict.ContainsKey("Status") ? dict["Status"]?.ToString() ?? "pending" : "pending",
-            StartDate = ParseDate(dict.ContainsKey("StartDate") ? dict["StartDate"]?.ToString() : null),
-            DueDate = ParseDate(dict.ContainsKey("DueDate") ? dict["DueDate"]?.ToString() :
-                                dict.ContainsKey("Due Date") ? dict["Due Date"]?.ToString() : null),
+            Comments = dict.ContainsKey("Comments") ? dict["Comments"]?.ToString() : null,
+            StartDate = startDateVal.HasValue ? DateOnly.FromDateTime(startDateVal.Value) : null,
+            DueDate = dueDateVal.HasValue ? DateOnly.FromDateTime(dueDateVal.Value) : null,
             CreatedAt = DateTime.UtcNow,
         };
         db.WorkTasks.Add(task);
@@ -248,26 +273,56 @@ if (File.Exists(workDaysFile))
     var records = csv.GetRecords<dynamic>().ToList();
     int count = 0;
 
+
+    // ── Helper: Safe time parsing ────────────────────────────────────
+    TimeOnly? ParseTime(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+
+        // Check if it's "16" meaning 16 hours? No, likely bad data.
+        // Standard formats: H:mm:ss, h:mm tt
+        if (TimeOnly.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var t))
+            return t;
+
+        // Handle "8 AM", "4:30 pm"
+        string[] formats = ["h:mm tt", "h tt", "H:mm", "H:mm:ss", "h:mm:ss tt"];
+        if (TimeOnly.TryParseExact(value, formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out t))
+            return t;
+
+        // Fallback: Try parsing as DateTime then extract Time
+        var dt = ParseDate(value, "TimeCheck");
+        if (dt.HasValue) return TimeOnly.FromDateTime(dt.Value);
+
+        return null;
+    }
+
+    // ... existing code ...
+
     foreach (var row in records)
     {
         var dict = (IDictionary<string, object>)row;
+
+        var workDateVal = ParseDate(dict.ContainsKey("Date") ? dict["Date"]?.ToString() :
+                                  dict.ContainsKey("WorkDate") ? dict["WorkDate"]?.ToString() : null, "WorkDate");
+
         var wd = new WorkDay
         {
             TenantId = tenantId,
             UserId = userId,
-            WorkDate = ParseDate(dict.ContainsKey("Date") ? dict["Date"]?.ToString() :
-                                  dict.ContainsKey("WorkDate") ? dict["WorkDate"]?.ToString() : null) ?? DateTime.UtcNow,
-            TimeIn1 = ParseDate(dict.ContainsKey("Time In") ? dict["Time In"]?.ToString() :
+            WorkDate = workDateVal.HasValue ? DateOnly.FromDateTime(workDateVal.Value) : DateOnly.FromDateTime(DateTime.UtcNow),
+            TimeIn1 = ParseTime(dict.ContainsKey("Time In") ? dict["Time In"]?.ToString() :
                                dict.ContainsKey("TimeIn1") ? dict["TimeIn1"]?.ToString() : null),
-            TimeOut1 = ParseDate(dict.ContainsKey("Time Out") ? dict["Time Out"]?.ToString() :
+            TimeOut1 = ParseTime(dict.ContainsKey("Time Out") ? dict["Time Out"]?.ToString() :
                                 dict.ContainsKey("TimeOut1") ? dict["TimeOut1"]?.ToString() : null),
-            TimeIn2 = ParseDate(dict.ContainsKey("TimeIn2") ? dict["TimeIn2"]?.ToString() : null),
-            TimeOut2 = ParseDate(dict.ContainsKey("TimeOut2") ? dict["TimeOut2"]?.ToString() : null),
-            TimeIn3 = ParseDate(dict.ContainsKey("TimeIn3") ? dict["TimeIn3"]?.ToString() : null),
-            TimeOut3 = ParseDate(dict.ContainsKey("TimeOut3") ? dict["TimeOut3"]?.ToString() : null),
+            TimeIn2 = ParseTime(dict.ContainsKey("TimeIn2") ? dict["TimeIn2"]?.ToString() : null),
+            TimeOut2 = ParseTime(dict.ContainsKey("TimeOut2") ? dict["TimeOut2"]?.ToString() : null),
+            TimeIn3 = ParseTime(dict.ContainsKey("TimeIn3") ? dict["TimeIn3"]?.ToString() : null),
+            TimeOut3 = ParseTime(dict.ContainsKey("TimeOut3") ? dict["TimeOut3"]?.ToString() : null),
             BreakMinutes = ParseInt(dict.ContainsKey("Break Minutes") ? dict["Break Minutes"]?.ToString() :
                                      dict.ContainsKey("BreakMinutes") ? dict["BreakMinutes"]?.ToString() : null) ?? 0,
             Comments = dict.ContainsKey("Comments") ? dict["Comments"]?.ToString() : null,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
         db.WorkDays.Add(wd);
         count++;
@@ -287,6 +342,10 @@ var notesFile = Path.Combine(csvDir, "Notes.csv");
 if (File.Exists(notesFile))
 {
     Console.Write("Importing Notes...");
+
+    // Cache existing WorkDates to avoid FK violations
+    var existingDates = new HashSet<DateOnly>(await db.WorkDays.Select(w => w.WorkDate).ToListAsync());
+
     using var reader = new StreamReader(notesFile);
     using var csv = new CsvReader(reader, csvConfig);
     var records = csv.GetRecords<dynamic>().ToList();
@@ -299,28 +358,52 @@ if (File.Exists(notesFile))
                             dict.ContainsKey("TaskID") ? dict["TaskID"]?.ToString() : null;
 
         int? taskId = null;
-        if (!string.IsNullOrEmpty(fmTaskId) && taskIdMap.TryGetValue(fmTaskId, out var mappedId))
-            taskId = mappedId;
+        if (!string.IsNullOrEmpty(fmTaskId))
+        {
+            if (taskIdMap.TryGetValue(fmTaskId, out var mappedId))
+                taskId = mappedId;
+        }
 
         string? noteContent = dict.ContainsKey("Note") ? dict["Note"]?.ToString() :
                               dict.ContainsKey("Content") ? dict["Content"]?.ToString() : null;
+
+        var noteDateVal = ParseDate(dict.ContainsKey("Date") ? dict["Date"]?.ToString() :
+                                  dict.ContainsKey("NoteDate") ? dict["NoteDate"]?.ToString() : null, "NoteDate");
+
+        var noteDate = noteDateVal.HasValue ? DateOnly.FromDateTime(noteDateVal.Value) : DateOnly.FromDateTime(DateTime.UtcNow);
+
+        // Ensure WorkDay exists
+        if (!existingDates.Contains(noteDate))
+        {
+            var newWorkDay = new WorkDay
+            {
+                TenantId = tenantId,
+                UserId = userId,
+                WorkDate = noteDate,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            db.WorkDays.Add(newWorkDay);
+            existingDates.Add(noteDate);
+        }
 
         var note = new WorkNote
         {
             TenantId = tenantId,
             UserId = userId,
             WorkTaskId = taskId,
-            NoteDate = ParseDate(dict.ContainsKey("Date") ? dict["Date"]?.ToString() :
-                                  dict.ContainsKey("NoteDate") ? dict["NoteDate"]?.ToString() : null) ?? DateTime.UtcNow,
+            NoteDate = noteDate,
             Content = JsonDocument.Parse(JsonSerializer.Serialize(new { text = noteContent ?? "" })),
             TimeMinutes = ParseInt(dict.ContainsKey("Time") ? dict["Time"]?.ToString() :
                                     dict.ContainsKey("TimeMinutes") ? dict["TimeMinutes"]?.ToString() :
                                     dict.ContainsKey("Time Minutes") ? dict["Time Minutes"]?.ToString() : null) ?? 0,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
         db.WorkNotes.Add(note);
         count++;
 
-        // Batch save every 1000 records for large datasets (54K+ notes)
+        // Batch save every 1000 records for large datasets
         if (count % 1000 == 0)
         {
             await db.SaveChangesAsync();
@@ -357,8 +440,8 @@ if (File.Exists(payPeriodsFile))
                          dict.ContainsKey("EndDate") ? dict["EndDate"]?.ToString() :
                          dict.ContainsKey("PeriodEndDate") ? dict["PeriodEndDate"]?.ToString() : null;
 
-        var startDate = ParseDate(startStr);
-        var endDate = ParseDate(endStr);
+        var startDate = ParseDate(startStr, "PeriodStartDate");
+        var endDate = ParseDate(endStr, "PeriodEndDate");
 
         var pp = new PayPeriod
         {
@@ -366,6 +449,9 @@ if (File.Exists(payPeriodsFile))
             UserId = userId,
             PeriodStartDate = startDate.HasValue ? DateOnly.FromDateTime(startDate.Value) : DateOnly.FromDateTime(DateTime.UtcNow),
             PeriodEndDate = endDate.HasValue ? DateOnly.FromDateTime(endDate.Value) : DateOnly.FromDateTime(DateTime.UtcNow),
+            Holidays = ParseInt(dict.ContainsKey("Holidays") ? dict["Holidays"]?.ToString() : null) ?? 0,
+            PtoReported = ParseInt(dict.ContainsKey("PtoReported") ? dict["PtoReported"]?.ToString() : null) ?? 0,
+            PtoDaysOfMonth = dict.ContainsKey("PtoDaysOfMonth") ? dict["PtoDaysOfMonth"]?.ToString() : null,
             CreatedAt = DateTime.UtcNow,
         };
         db.PayPeriods.Add(pp);

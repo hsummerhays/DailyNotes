@@ -50,8 +50,8 @@ namespace DailyNotes.Api.Controllers
                 return NotFound();
 
             var workDays = await _context.WorkDays
-                .Where(w => DateOnly.FromDateTime(w.WorkDate) >= period.PeriodStartDate
-                         && DateOnly.FromDateTime(w.WorkDate) <= period.PeriodEndDate)
+                .Where(w => w.WorkDate >= period.PeriodStartDate
+                         && w.WorkDate <= period.PeriodEndDate)
                 .OrderBy(w => w.WorkDate)
                 .ToListAsync();
 

@@ -21,13 +21,13 @@ namespace DailyNotes.Api.Controllers
         /// <summary>GET /api/work-notes?date=2025-01-15&taskId=1</summary>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<WorkNote>>> GetAll(
-            [FromQuery] DateTime? date,
+            [FromQuery] DateOnly? date,
             [FromQuery] int? taskId)
         {
             var query = _context.WorkNotes.AsQueryable();
 
             if (date.HasValue)
-                query = query.Where(n => n.NoteDate.Date == date.Value.Date);
+                query = query.Where(n => n.NoteDate == date.Value);
 
             if (taskId.HasValue)
                 query = query.Where(n => n.WorkTaskId == taskId.Value);

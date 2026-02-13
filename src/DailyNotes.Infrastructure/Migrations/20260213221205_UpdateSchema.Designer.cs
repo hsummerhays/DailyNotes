@@ -5,6 +5,7 @@ using System.Text.Json;
 using DailyNotes.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -13,9 +14,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace DailyNotes.Infrastructure.Migrations
 {
     [DbContext(typeof(DailyNotesDbContext))]
-    partial class DailyNotesDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260213221205_UpdateSchema")]
+    partial class UpdateSchema
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

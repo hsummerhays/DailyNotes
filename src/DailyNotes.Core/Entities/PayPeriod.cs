@@ -9,6 +9,9 @@ namespace DailyNotes.Core.Entities
         public string UserId { get; set; } = string.Empty;
         public DateOnly PeriodStartDate { get; set; }
         public DateOnly PeriodEndDate { get; set; }
+        public int Holidays { get; set; } = 0;
+        public int PtoReported { get; set; } = 0;
+        public string? PtoDaysOfMonth { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 }

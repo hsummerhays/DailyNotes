@@ -1,15 +1,43 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear } from 'date-fns';
+
+type FilterMode = 'day' | 'month' | 'last_month' | 'year' | 'all';
 
 export default function WorkDaysPage() {
     const queryClient = useQueryClient();
-    const [dateFilter, setDateFilter] = useState(format(new Date(), 'yyyy-MM-dd'));
+    const [filterMode, setFilterMode] = useState<FilterMode>('month');
+    const [selectedDate, setSelectedDate] = useState(new Date());
 
     const { data: workDays, isLoading } = useQuery({
-        queryKey: ['work-days', dateFilter],
-        queryFn: () => api.get(`/work-days?date=${dateFilter}`).then((r) => r.data),
+        queryKey: ['work-days', filterMode, format(selectedDate, 'yyyy-MM-dd')],
+        queryFn: async () => {
+            if (filterMode === 'day') {
+                return api.get(`/work-days?date=${format(selectedDate, 'yyyy-MM-dd')}`).then(r => r.data);
+            }
+            if (filterMode === 'all') {
+                return api.get(`/work-days?all=true`).then(r => r.data);
+            }
+
+            let from, to;
+            if (filterMode === 'month') {
+                from = startOfMonth(selectedDate);
+                to = endOfMonth(selectedDate);
+            } else if (filterMode === 'last_month') {
+                const lastMonth = subMonths(new Date(), 1);
+                from = startOfMonth(lastMonth);
+                to = endOfMonth(lastMonth);
+            } else if (filterMode === 'year') {
+                from = startOfYear(selectedDate);
+                to = endOfYear(selectedDate);
+            }
+
+            if (from && to) {
+                return api.get(`/work-days?from=${format(from, 'yyyy-MM-dd')}&to=${format(to, 'yyyy-MM-dd')}`).then(r => r.data);
+            }
+            return [];
+        },
     });
 
     const { data: today } = useQuery({
@@ -28,21 +56,48 @@ export default function WorkDaysPage() {
 
     return (
         <>
-            <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
                     <h1 style={{ fontSize: '1.5rem', fontWeight: 600 }}>📅 Work Days</h1>
                     <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>Track your daily work sessions</p>
                 </div>
-                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                    <input
-                        className="input"
-                        type="date"
-                        value={dateFilter}
-                        onChange={(e) => setDateFilter(e.target.value)}
-                        style={{ width: 180 }}
-                    />
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <div className="btn-group">
+                        <button
+                            className={`btn ${filterMode === 'month' ? 'btn-primary' : 'btn-secondary'}`}
+                            onClick={() => setFilterMode('month')}
+                        >
+                            This Month
+                        </button>
+                        <button
+                            className={`btn ${filterMode === 'last_month' ? 'btn-primary' : 'btn-secondary'}`}
+                            onClick={() => setFilterMode('last_month')}
+                        >
+                            Last Month
+                        </button>
+                        <button
+                            className={`btn ${filterMode === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+                            onClick={() => setFilterMode('all')}
+                        >
+                            All
+                        </button>
+                    </div>
+
+                    <div style={{ borderLeft: '1px solid var(--color-border)', paddingLeft: '0.5rem', marginLeft: '0.5rem' }}>
+                        <input
+                            className="input"
+                            type="date"
+                            value={format(selectedDate, 'yyyy-MM-dd')}
+                            onChange={(e) => {
+                                setSelectedDate(new Date(e.target.value));
+                                setFilterMode('day');
+                            }}
+                            style={{ width: 'auto' }}
+                        />
+                    </div>
+
                     {!today && (
-                        <button className="btn btn-primary" onClick={() => clockIn.mutate()}>
+                        <button className="btn btn-primary" onClick={() => clockIn.mutate()} style={{ marginLeft: '1rem' }}>
                             Clock In
                         </button>
                     )}
@@ -76,35 +131,48 @@ export default function WorkDaysPage() {
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                         {workDays?.map((wd: any) => (
-                            <div key={wd.id} className="card" style={{ padding: '1rem' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div>
-                                        <span style={{ fontWeight: 500 }}>{format(new Date(wd.workDate), 'EEEE, MMM d')}</span>
-                                        <span style={{ marginLeft: '1rem', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-                                            {wd.timeIn && format(new Date(wd.timeIn), 'h:mm a')}
-                                            {wd.timeOut && ` → ${format(new Date(wd.timeOut), 'h:mm a')}`}
-                                        </span>
-                                    </div>
-                                    <span style={{ fontWeight: 600, color: 'var(--color-accent)' }}>
-                                        {wd.totalHours?.toFixed(1) ?? '—'}h
-                                    </span>
-                                </div>
-                                {wd.comments && (
-                                    <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginTop: '0.5rem' }}>
-                                        {wd.comments}
-                                    </p>
-                                )}
-                            </div>
+                            <WorkDayCard key={wd.id} wd={wd} />
                         ))}
                         {(!workDays || workDays.length === 0) && (
                             <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '2rem' }}>
-                                No work days found for this date
+                                No work days found for this filter.
                             </p>
                         )}
                     </div>
                 )}
             </div>
         </>
+    );
+}
+
+function WorkDayCard({ wd }: { wd: any }) {
+    return (
+        <div className="card" style={{ padding: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                    <span style={{ fontWeight: 500 }}>{format(new Date(wd.workDate), 'EEEE, MMM d, yyyy')}</span>
+                    <span style={{ marginLeft: '1rem', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                        {wd.timeIn && format(new Date(wd.timeIn), 'h:mm a')}
+                        {wd.timeOut && ` → ${format(new Date(wd.timeOut), 'h:mm a')}`}
+                    </span>
+                </div>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                    {wd.breakMinutes > 0 && (
+                        <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                            {wd.breakMinutes}m break
+                        </span>
+                    )}
+                    <span style={{ fontWeight: 600, color: 'var(--color-accent)', minWidth: '3rem', textAlign: 'right' }}>
+                        {wd.totalHours?.toFixed(1) ?? '—'}h
+                    </span>
+                </div>
+            </div>
+            {wd.comments && (
+                <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginTop: '0.5rem' }}>
+                    {wd.comments}
+                </p>
+            )}
+        </div>
     );
 }
 
