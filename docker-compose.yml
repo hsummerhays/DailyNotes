@@ -20,7 +20,7 @@ services:
       - ConnectionStrings__DefaultConnection=Host=postgres;Database=DailyNotes;Username=postgres;Password=password
       - ASPNETCORE_ENVIRONMENT=Development
     ports:
-      - "5000:8080"
+      - "5010:8080"
     depends_on:
       - postgres
 
