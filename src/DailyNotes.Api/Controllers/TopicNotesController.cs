@@ -24,11 +24,7 @@ namespace DailyNotes.Api.Controllers
             [FromQuery] int? topicId,
             [FromQuery] int? tagId)
         {
-            var tenantId = CurrentTenantId;
-            var userId = CurrentUserId;
-            var query = _context.TopicNotes
-                .Where(n => n.TenantId == tenantId && n.UserId == userId)
-                .AsQueryable();
+            var query = TenantScoped(_context.TopicNotes).AsQueryable();
 
             if (topicId.HasValue)
                 query = query.Where(n => n.TopicId == topicId.Value);
@@ -48,10 +44,8 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<TopicNote>> GetById(int id)
         {
-            var tenantId = CurrentTenantId;
-            var userId = CurrentUserId;
-            var note = await _context.TopicNotes
-                .FirstOrDefaultAsync(n => n.Id == id && n.TenantId == tenantId && n.UserId == userId);
+            var note = await TenantScoped(_context.TopicNotes)
+                .FirstOrDefaultAsync(n => n.Id == id);
             if (note == null)
                 return NotFound();
 
@@ -78,10 +72,8 @@ namespace DailyNotes.Api.Controllers
             if (id != topicNote.Id)
                 return BadRequest(new { message = "ID mismatch." });
 
-            var tenantId = CurrentTenantId;
-            var userId = CurrentUserId;
-            var existing = await _context.TopicNotes
-                .FirstOrDefaultAsync(n => n.Id == id && n.TenantId == tenantId && n.UserId == userId);
+            var existing = await TenantScoped(_context.TopicNotes)
+                .FirstOrDefaultAsync(n => n.Id == id);
             if (existing == null)
                 return NotFound();
 
@@ -100,10 +92,8 @@ namespace DailyNotes.Api.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var tenantId = CurrentTenantId;
-            var userId = CurrentUserId;
-            var note = await _context.TopicNotes
-                .FirstOrDefaultAsync(n => n.Id == id && n.TenantId == tenantId && n.UserId == userId);
+            var note = await TenantScoped(_context.TopicNotes)
+                .FirstOrDefaultAsync(n => n.Id == id);
             if (note == null)
                 return NotFound();
 

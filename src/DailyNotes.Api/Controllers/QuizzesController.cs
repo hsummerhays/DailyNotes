@@ -24,10 +24,7 @@ namespace DailyNotes.Api.Controllers
             [FromQuery] int? topicId,
             [FromQuery] int? difficulty)
         {
-            var tenantId = CurrentTenantId;
-            var query = _context.Quizzes
-                .Where(q => q.TenantId == tenantId)
-                .AsQueryable();
+            var query = TenantOnlyScoped(_context.Quizzes).AsQueryable();
 
             if (topicId.HasValue)
                 query = query.Where(q => q.TopicId == topicId.Value);
@@ -42,9 +39,8 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<object>> GetById(int id)
         {
-            var tenantId = CurrentTenantId;
-            var quiz = await _context.Quizzes
-                .FirstOrDefaultAsync(q => q.Id == id && q.TenantId == tenantId);
+            var quiz = await TenantOnlyScoped(_context.Quizzes)
+                .FirstOrDefaultAsync(q => q.Id == id);
             if (quiz == null)
                 return NotFound();
 
@@ -88,9 +84,8 @@ namespace DailyNotes.Api.Controllers
             if (id != quiz.Id)
                 return BadRequest(new { message = "ID mismatch." });
 
-            var tenantId = CurrentTenantId;
-            var existing = await _context.Quizzes
-                .FirstOrDefaultAsync(q => q.Id == id && q.TenantId == tenantId);
+            var existing = await TenantOnlyScoped(_context.Quizzes)
+                .FirstOrDefaultAsync(q => q.Id == id);
             if (existing == null)
                 return NotFound();
 
@@ -106,9 +101,8 @@ namespace DailyNotes.Api.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var tenantId = CurrentTenantId;
-            var quiz = await _context.Quizzes
-                .FirstOrDefaultAsync(q => q.Id == id && q.TenantId == tenantId);
+            var quiz = await TenantOnlyScoped(_context.Quizzes)
+                .FirstOrDefaultAsync(q => q.Id == id);
             if (quiz == null)
                 return NotFound();
 
@@ -122,9 +116,8 @@ namespace DailyNotes.Api.Controllers
         [HttpPost("{quizId}/questions")]
         public async Task<ActionResult<QuizQuestion>> AddQuestion(int quizId, QuizQuestion question)
         {
-            var tenantId = CurrentTenantId;
-            var quiz = await _context.Quizzes
-                .FirstOrDefaultAsync(q => q.Id == quizId && q.TenantId == tenantId);
+            var quiz = await TenantOnlyScoped(_context.Quizzes)
+                .FirstOrDefaultAsync(q => q.Id == quizId);
             if (quiz == null)
                 return NotFound(new { message = "Quiz not found." });
 
@@ -142,6 +135,12 @@ namespace DailyNotes.Api.Controllers
             var question = await _context.QuizQuestions.FindAsync(questionId);
             if (question == null)
                 return NotFound(new { message = "Question not found." });
+
+            // Security check: ensure the quiz belongs to the current tenant
+            var quiz = await TenantOnlyScoped(_context.Quizzes)
+                .FirstOrDefaultAsync(q => q.Id == question.QuizId);
+            if (quiz == null)
+                return NotFound(new { message = "Quiz not found or access denied." });
 
             option.QuestionId = questionId;
             _context.QuizOptions.Add(option);

@@ -1,9 +1,10 @@
 using System;
 using System.Collections.Generic;
+using DailyNotes.Core.Interfaces;
 
 namespace DailyNotes.Core.Entities
 {
-    public class WorkDay
+    public class WorkDay : IHasTenantUser
     {
         public int Id { get; set; }
         public int TenantId { get; set; }

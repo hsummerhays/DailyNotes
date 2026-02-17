@@ -11,6 +11,7 @@ using DailyNotes.Core.Interfaces;
 using DailyNotes.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+File.WriteAllText("env_debug.txt", $"Environment: {builder.Environment.EnvironmentName}\n");
 
 // Add services to the container.
 
@@ -29,8 +30,11 @@ builder.Services.AddSwaggerGen();
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
-builder.Services.AddDbContext<DailyNotesDbContext>(options =>
-    options.UseNpgsql(connectionString));
+if (!builder.Environment.IsEnvironment("Testing"))
+{
+    builder.Services.AddDbContext<DailyNotesDbContext>(options =>
+        options.UseNpgsql(connectionString));
+}
 
 // Identity
 builder.Services.AddIdentityCore<IdentityUser>(options => options.SignIn.RequireConfirmedAccount = false)

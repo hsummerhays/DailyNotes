@@ -1,9 +1,10 @@
 using System;
 using System.Text.Json;
+using DailyNotes.Core.Interfaces;
 
 namespace DailyNotes.Core.Entities
 {
-    public class WorkNote
+    public class WorkNote : IHasTenantUser
     {
         public int Id { get; set; }
         public int TenantId { get; set; }

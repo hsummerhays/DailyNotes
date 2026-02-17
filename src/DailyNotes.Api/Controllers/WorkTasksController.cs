@@ -24,11 +24,7 @@ namespace DailyNotes.Api.Controllers
             [FromQuery] string? status,
             [FromQuery] int? projectId)
         {
-            var tenantId = CurrentTenantId;
-            var userId = CurrentUserId;
-            var query = _context.WorkTasks
-                .Where(t => t.TenantId == tenantId && t.UserId == userId)
-                .AsQueryable();
+            var query = TenantScoped(_context.WorkTasks).AsQueryable();
 
             if (!string.IsNullOrEmpty(status))
                 query = query.Where(t => t.Status == status);
@@ -43,12 +39,9 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("overdue")]
         public async Task<ActionResult<IEnumerable<WorkTask>>> GetOverdue()
         {
-            var tenantId = CurrentTenantId;
-            var userId = CurrentUserId;
             var now = DateOnly.FromDateTime(DateTime.UtcNow);
-            return await _context.WorkTasks
-                .Where(t => t.TenantId == tenantId && t.UserId == userId
-                    && t.DueDate.HasValue && t.DueDate < now && t.Status != "completed")
+            return await TenantScoped(_context.WorkTasks)
+                .Where(t => t.DueDate.HasValue && t.DueDate < now && t.Status != "completed")
                 .OrderBy(t => t.DueDate)
                 .ToListAsync();
         }
@@ -57,10 +50,8 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<WorkTask>> GetById(int id)
         {
-            var tenantId = CurrentTenantId;
-            var userId = CurrentUserId;
-            var task = await _context.WorkTasks
-                .FirstOrDefaultAsync(t => t.Id == id && t.TenantId == tenantId && t.UserId == userId);
+            var task = await TenantScoped(_context.WorkTasks)
+                .FirstOrDefaultAsync(t => t.Id == id);
             if (task == null)
                 return NotFound();
 
@@ -89,10 +80,8 @@ namespace DailyNotes.Api.Controllers
             if (id != workTask.Id)
                 return BadRequest(new { message = "ID mismatch." });
 
-            var tenantId = CurrentTenantId;
-            var userId = CurrentUserId;
-            var existing = await _context.WorkTasks
-                .FirstOrDefaultAsync(t => t.Id == id && t.TenantId == tenantId && t.UserId == userId);
+            var existing = await TenantScoped(_context.WorkTasks)
+                .FirstOrDefaultAsync(t => t.Id == id);
             if (existing == null)
                 return NotFound();
 
@@ -117,10 +106,8 @@ namespace DailyNotes.Api.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var tenantId = CurrentTenantId;
-            var userId = CurrentUserId;
-            var task = await _context.WorkTasks
-                .FirstOrDefaultAsync(t => t.Id == id && t.TenantId == tenantId && t.UserId == userId);
+            var task = await TenantScoped(_context.WorkTasks)
+                .FirstOrDefaultAsync(t => t.Id == id);
             if (task == null)
                 return NotFound();
 

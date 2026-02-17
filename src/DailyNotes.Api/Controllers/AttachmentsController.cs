@@ -24,11 +24,7 @@ namespace DailyNotes.Api.Controllers
             [FromQuery] string? itemType,
             [FromQuery] int? itemId)
         {
-            var tenantId = CurrentTenantId;
-            var userId = CurrentUserId;
-            var query = _context.Attachments
-                .Where(a => a.TenantId == tenantId && a.UserId == userId)
-                .AsQueryable();
+            var query = TenantScoped(_context.Attachments).AsQueryable();
 
             if (!string.IsNullOrEmpty(itemType))
                 query = query.Where(a => a.ItemType == itemType);
@@ -42,10 +38,8 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<Attachment>> GetById(int id)
         {
-            var tenantId = CurrentTenantId;
-            var userId = CurrentUserId;
-            var attachment = await _context.Attachments
-                .FirstOrDefaultAsync(a => a.Id == id && a.TenantId == tenantId && a.UserId == userId);
+            var attachment = await TenantScoped(_context.Attachments)
+                .FirstOrDefaultAsync(a => a.Id == id);
             if (attachment == null)
                 return NotFound();
 
@@ -69,10 +63,8 @@ namespace DailyNotes.Api.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var tenantId = CurrentTenantId;
-            var userId = CurrentUserId;
-            var attachment = await _context.Attachments
-                .FirstOrDefaultAsync(a => a.Id == id && a.TenantId == tenantId && a.UserId == userId);
+            var attachment = await TenantScoped(_context.Attachments)
+                .FirstOrDefaultAsync(a => a.Id == id);
             if (attachment == null)
                 return NotFound();
 

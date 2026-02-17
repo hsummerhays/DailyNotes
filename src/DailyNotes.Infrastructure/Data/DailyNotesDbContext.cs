@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using DailyNotes.Core.Entities;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace DailyNotes.Infrastructure.Data
 {
@@ -243,6 +244,30 @@ namespace DailyNotes.Infrastructure.Data
                 entity.Property(e => e.PtoDaysOfMonth).HasColumnName("PtoDaysOfMonth");
                 entity.Property(e => e.CreatedAt).HasColumnName("CreatedAt");
             });
+
+            // SQLite / InMemory fallback for JsonDocument types
+            if (Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory" || Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite")
+            {
+                var jsonConverter = new ValueConverter<JsonDocument, string>(
+                    v => v.RootElement.ToString(),
+                    v => JsonDocument.Parse(v, default));
+
+                builder.Entity<TenantUser>()
+                    .Property(e => e.Preferences)
+                    .HasConversion(jsonConverter);
+
+                builder.Entity<WorkNote>()
+                    .Property(e => e.Content)
+                    .HasConversion(jsonConverter);
+
+                builder.Entity<TopicNote>()
+                    .Property(e => e.Content)
+                    .HasConversion(jsonConverter);
+
+                builder.Entity<WebhookEvent>()
+                    .Property(e => e.Payload)
+                    .HasConversion(jsonConverter);
+            }
         }
     }
 }

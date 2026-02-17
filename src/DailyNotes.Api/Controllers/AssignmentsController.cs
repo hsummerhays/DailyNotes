@@ -25,15 +25,7 @@ namespace DailyNotes.Api.Controllers
             [FromQuery] string? status,
             [FromQuery] DateTime? dueDate)
         {
-            var tenantId = CurrentTenantId;
-            var userId = CurrentUserId;
-            // Scope assignments through their parent course
-            var allowedCourseIds = _context.Courses
-                .Where(c => c.TenantId == tenantId && c.UserId == userId)
-                .Select(c => c.Id);
-            var query = _context.Assignments
-                .Where(a => allowedCourseIds.Contains(a.CourseId))
-                .AsQueryable();
+            var query = TenantScoped(_context.Assignments).AsQueryable();
 
             if (courseId.HasValue)
                 query = query.Where(a => a.CourseId == courseId.Value);
@@ -50,7 +42,8 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<Assignment>> GetById(int id)
         {
-            var assignment = await _context.Assignments.FindAsync(id);
+            var assignment = await TenantScoped(_context.Assignments)
+                .FirstOrDefaultAsync(a => a.Id == id);
             if (assignment == null)
                 return NotFound();
 
@@ -60,6 +53,8 @@ namespace DailyNotes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<Assignment>> Create(Assignment assignment)
         {
+            assignment.TenantId = CurrentTenantId;
+            assignment.UserId = CurrentUserId;
             assignment.CreatedAt = DateTime.UtcNow;
             assignment.UpdatedAt = DateTime.UtcNow;
 
@@ -75,7 +70,8 @@ namespace DailyNotes.Api.Controllers
             if (id != assignment.Id)
                 return BadRequest(new { message = "ID mismatch." });
 
-            var existing = await _context.Assignments.FindAsync(id);
+            var existing = await TenantScoped(_context.Assignments)
+                .FirstOrDefaultAsync(a => a.Id == id);
             if (existing == null)
                 return NotFound();
 
@@ -97,7 +93,8 @@ namespace DailyNotes.Api.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var assignment = await _context.Assignments.FindAsync(id);
+            var assignment = await TenantScoped(_context.Assignments)
+                .FirstOrDefaultAsync(a => a.Id == id);
             if (assignment == null)
                 return NotFound();
 

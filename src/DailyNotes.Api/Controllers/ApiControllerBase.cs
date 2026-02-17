@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using System.Linq;
+using DailyNotes.Core.Interfaces;
 
 namespace DailyNotes.Api.Controllers
 {
@@ -18,6 +20,27 @@ namespace DailyNotes.Api.Controllers
                 if (int.TryParse(claim, out var id)) return id;
                 throw new UnauthorizedAccessException("Tenant ID claim not found or invalid.");
             }
+        }
+
+        /// <summary>
+        /// Scope an IQueryable to the current tenant and user.
+        /// Usage: TenantScoped(_context.YourDbSet)
+        /// </summary>
+        protected IQueryable<T> TenantScoped<T>(IQueryable<T> query) where T : class, IHasTenantUser
+        {
+            var tenantId = CurrentTenantId;
+            var userId = CurrentUserId;
+            return query.Where(e => e.TenantId == tenantId && e.UserId == userId);
+        }
+
+        /// <summary>
+        /// Scope an IQueryable to the current tenant only.
+        /// Usage: TenantOnlyScoped(_context.Tags)
+        /// </summary>
+        protected IQueryable<T> TenantOnlyScoped<T>(IQueryable<T> query) where T : class, IHasTenant
+        {
+            var tenantId = CurrentTenantId;
+            return query.Where(e => e.TenantId == tenantId);
         }
     }
 }

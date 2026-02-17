@@ -22,10 +22,7 @@ namespace DailyNotes.Api.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Topic>>> GetAll([FromQuery] int? parentId)
         {
-            var tenantId = CurrentTenantId;
-            var query = _context.Topics
-                .Where(t => t.TenantId == tenantId)
-                .AsQueryable();
+            var query = TenantScoped(_context.Topics).AsQueryable();
 
             if (parentId.HasValue)
                 query = query.Where(t => t.ParentTopicId == parentId.Value);
@@ -39,9 +36,8 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<Topic>> GetById(int id)
         {
-            var tenantId = CurrentTenantId;
-            var topic = await _context.Topics
-                .FirstOrDefaultAsync(t => t.Id == id && t.TenantId == tenantId);
+            var topic = await TenantScoped(_context.Topics)
+                .FirstOrDefaultAsync(t => t.Id == id);
             if (topic == null)
                 return NotFound();
 
@@ -52,9 +48,14 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("{id}/children")]
         public async Task<ActionResult<IEnumerable<Topic>>> GetChildren(int id)
         {
-            var tenantId = CurrentTenantId;
-            return await _context.Topics
-                .Where(t => t.ParentTopicId == id && t.TenantId == tenantId)
+            // Verify parent exists/access
+            var parent = await TenantScoped(_context.Topics)
+                .FirstOrDefaultAsync(t => t.Id == id);
+            if (parent == null)
+                return NotFound();
+
+            return await TenantScoped(_context.Topics)
+                .Where(t => t.ParentTopicId == id)
                 .OrderBy(t => t.Title)
                 .ToListAsync();
         }
@@ -63,12 +64,14 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("{id}/notes")]
         public async Task<ActionResult<IEnumerable<TopicNote>>> GetTopicNotes(int id)
         {
-            var tenantId = CurrentTenantId;
-            var topic = await _context.Topics
-                .FirstOrDefaultAsync(t => t.Id == id && t.TenantId == tenantId);
+            var topic = await TenantScoped(_context.Topics)
+                .FirstOrDefaultAsync(t => t.Id == id);
             if (topic == null)
                 return NotFound();
 
+            // TopicNotes likely need scoping too if they are entities. 
+            // Assuming for now they are children of topic and we have access if we have access to topic.
+            // But better to check. TopicNote likely has TenantId?
             return await _context.TopicNotes
                 .Where(n => n.TopicId == id)
                 .OrderByDescending(n => n.CreatedAt)
@@ -79,6 +82,7 @@ namespace DailyNotes.Api.Controllers
         public async Task<ActionResult<Topic>> Create(Topic topic)
         {
             topic.TenantId = CurrentTenantId;
+            topic.UserId = CurrentUserId;
             topic.CreatedAt = DateTime.UtcNow;
             topic.UpdatedAt = DateTime.UtcNow;
 
@@ -94,9 +98,8 @@ namespace DailyNotes.Api.Controllers
             if (id != topic.Id)
                 return BadRequest(new { message = "ID mismatch." });
 
-            var tenantId = CurrentTenantId;
-            var existing = await _context.Topics
-                .FirstOrDefaultAsync(t => t.Id == id && t.TenantId == tenantId);
+            var existing = await TenantScoped(_context.Topics)
+                .FirstOrDefaultAsync(t => t.Id == id);
             if (existing == null)
                 return NotFound();
 
@@ -117,9 +120,8 @@ namespace DailyNotes.Api.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var tenantId = CurrentTenantId;
-            var topic = await _context.Topics
-                .FirstOrDefaultAsync(t => t.Id == id && t.TenantId == tenantId);
+            var topic = await TenantScoped(_context.Topics)
+                .FirstOrDefaultAsync(t => t.Id == id);
             if (topic == null)
                 return NotFound();
 

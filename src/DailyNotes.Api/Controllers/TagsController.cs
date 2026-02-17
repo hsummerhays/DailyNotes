@@ -22,9 +22,7 @@ namespace DailyNotes.Api.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Tag>>> GetAll()
         {
-            var tenantId = CurrentTenantId;
-            return await _context.Tags
-                .Where(t => t.TenantId == tenantId)
+            return await TenantOnlyScoped(_context.Tags)
                 .OrderBy(t => t.Name)
                 .ToListAsync();
         }
@@ -32,9 +30,8 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<Tag>> GetById(int id)
         {
-            var tenantId = CurrentTenantId;
-            var tag = await _context.Tags
-                .FirstOrDefaultAsync(t => t.Id == id && t.TenantId == tenantId);
+            var tag = await TenantOnlyScoped(_context.Tags)
+                .FirstOrDefaultAsync(t => t.Id == id);
             if (tag == null)
                 return NotFound();
 
@@ -57,9 +54,8 @@ namespace DailyNotes.Api.Controllers
             if (id != tag.Id)
                 return BadRequest(new { message = "ID mismatch." });
 
-            var tenantId = CurrentTenantId;
-            var existing = await _context.Tags
-                .FirstOrDefaultAsync(t => t.Id == id && t.TenantId == tenantId);
+            var existing = await TenantOnlyScoped(_context.Tags)
+                .FirstOrDefaultAsync(t => t.Id == id);
             if (existing == null)
                 return NotFound();
 
@@ -74,9 +70,8 @@ namespace DailyNotes.Api.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var tenantId = CurrentTenantId;
-            var tag = await _context.Tags
-                .FirstOrDefaultAsync(t => t.Id == id && t.TenantId == tenantId);
+            var tag = await TenantOnlyScoped(_context.Tags)
+                .FirstOrDefaultAsync(t => t.Id == id);
             if (tag == null)
                 return NotFound();
 
@@ -90,9 +85,8 @@ namespace DailyNotes.Api.Controllers
         [HttpPost("{tagId}/items")]
         public async Task<IActionResult> TagItem(int tagId, [FromBody] ItemTag itemTag)
         {
-            var tenantId = CurrentTenantId;
-            var tag = await _context.Tags
-                .FirstOrDefaultAsync(t => t.Id == tagId && t.TenantId == tenantId);
+            var tag = await TenantOnlyScoped(_context.Tags)
+                .FirstOrDefaultAsync(t => t.Id == tagId);
             if (tag == null)
                 return NotFound(new { message = "Tag not found." });
 
@@ -107,6 +101,12 @@ namespace DailyNotes.Api.Controllers
         [HttpDelete("{tagId}/items/{itemType}/{itemId}")]
         public async Task<IActionResult> UntagItem(int tagId, string itemType, int itemId)
         {
+            // Verify tag ownership
+            var tag = await TenantOnlyScoped(_context.Tags)
+                .FirstOrDefaultAsync(t => t.Id == tagId);
+            if (tag == null)
+                return NotFound(new { message = "Tag not found." });
+
             var itemTag = await _context.ItemTags
                 .FirstOrDefaultAsync(it => it.TagId == tagId && it.ItemType == itemType && it.ItemId == itemId);
 
@@ -123,6 +123,12 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("{tagId}/items")]
         public async Task<ActionResult<IEnumerable<ItemTag>>> GetTaggedItems(int tagId)
         {
+            // Verify tag ownership
+            var tag = await TenantOnlyScoped(_context.Tags)
+                .FirstOrDefaultAsync(t => t.Id == tagId);
+            if (tag == null)
+                return NotFound(new { message = "Tag not found." });
+
             return await _context.ItemTags
                 .Where(it => it.TagId == tagId)
                 .ToListAsync();

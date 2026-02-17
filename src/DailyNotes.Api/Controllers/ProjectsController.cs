@@ -22,10 +22,7 @@ namespace DailyNotes.Api.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Project>>> GetAll()
         {
-            var tenantId = CurrentTenantId;
-            var userId = CurrentUserId;
-            return await _context.Projects
-                .Where(p => p.TenantId == tenantId && p.UserId == userId)
+            return await TenantScoped(_context.Projects)
                 .OrderByDescending(p => p.CreatedAt)
                 .ToListAsync();
         }
@@ -34,10 +31,8 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<Project>> GetById(int id)
         {
-            var tenantId = CurrentTenantId;
-            var userId = CurrentUserId;
-            var project = await _context.Projects
-                .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId && p.UserId == userId);
+            var project = await TenantScoped(_context.Projects)
+                .FirstOrDefaultAsync(p => p.Id == id);
             if (project == null)
                 return NotFound();
 
@@ -48,15 +43,13 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("{id}/tasks")]
         public async Task<ActionResult<IEnumerable<WorkTask>>> GetProjectTasks(int id)
         {
-            var tenantId = CurrentTenantId;
-            var userId = CurrentUserId;
-            var project = await _context.Projects
-                .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId && p.UserId == userId);
+            var project = await TenantScoped(_context.Projects)
+                .FirstOrDefaultAsync(p => p.Id == id);
             if (project == null)
                 return NotFound();
 
-            var tasks = await _context.WorkTasks
-                .Where(t => t.ProjectId == id && t.TenantId == tenantId && t.UserId == userId)
+            var tasks = await TenantScoped(_context.WorkTasks)
+                .Where(t => t.ProjectId == id)
                 .OrderByDescending(t => t.CreatedAt)
                 .ToListAsync();
 
@@ -85,10 +78,8 @@ namespace DailyNotes.Api.Controllers
             if (id != project.Id)
                 return BadRequest(new { message = "ID mismatch." });
 
-            var tenantId = CurrentTenantId;
-            var userId = CurrentUserId;
-            var existing = await _context.Projects
-                .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId && p.UserId == userId);
+            var existing = await TenantScoped(_context.Projects)
+                .FirstOrDefaultAsync(p => p.Id == id);
             if (existing == null)
                 return NotFound();
 
@@ -104,14 +95,11 @@ namespace DailyNotes.Api.Controllers
             return NoContent();
         }
 
-        /// <summary>DELETE /api/projects/{id}</summary>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var tenantId = CurrentTenantId;
-            var userId = CurrentUserId;
-            var project = await _context.Projects
-                .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId && p.UserId == userId);
+            var project = await TenantScoped(_context.Projects)
+                .FirstOrDefaultAsync(p => p.Id == id);
             if (project == null)
                 return NotFound();
 

@@ -22,11 +22,7 @@ namespace DailyNotes.Api.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<PayPeriod>>> GetAll([FromQuery] DateOnly? date)
         {
-            var tenantId = CurrentTenantId;
-            var userId = CurrentUserId;
-            var query = _context.PayPeriods
-                .Where(p => p.TenantId == tenantId && p.UserId == userId)
-                .AsQueryable();
+            var query = TenantScoped(_context.PayPeriods).AsQueryable();
 
             if (date.HasValue)
                 query = query.Where(p => p.PeriodStartDate <= date.Value && p.PeriodEndDate >= date.Value);
@@ -38,10 +34,8 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<PayPeriod>> GetById(int id)
         {
-            var tenantId = CurrentTenantId;
-            var userId = CurrentUserId;
-            var period = await _context.PayPeriods
-                .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId && p.UserId == userId);
+            var period = await TenantScoped(_context.PayPeriods)
+                .FirstOrDefaultAsync(p => p.Id == id);
             if (period == null)
                 return NotFound();
 
@@ -52,16 +46,13 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("{id}/work-days")]
         public async Task<ActionResult<IEnumerable<WorkDay>>> GetPayPeriodWorkDays(int id)
         {
-            var tenantId = CurrentTenantId;
-            var userId = CurrentUserId;
-            var period = await _context.PayPeriods
-                .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId && p.UserId == userId);
+            var period = await TenantScoped(_context.PayPeriods)
+                .FirstOrDefaultAsync(p => p.Id == id);
             if (period == null)
                 return NotFound();
 
-            var workDays = await _context.WorkDays
-                .Where(w => w.TenantId == tenantId && w.UserId == userId
-                         && w.WorkDate >= period.PeriodStartDate
+            var workDays = await TenantScoped(_context.WorkDays)
+                .Where(w => w.WorkDate >= period.PeriodStartDate
                          && w.WorkDate <= period.PeriodEndDate)
                 .OrderBy(w => w.WorkDate)
                 .ToListAsync();
@@ -90,10 +81,8 @@ namespace DailyNotes.Api.Controllers
             if (id != payPeriod.Id)
                 return BadRequest(new { message = "ID mismatch." });
 
-            var tenantId = CurrentTenantId;
-            var userId = CurrentUserId;
-            var existing = await _context.PayPeriods
-                .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId && p.UserId == userId);
+            var existing = await TenantScoped(_context.PayPeriods)
+                .FirstOrDefaultAsync(p => p.Id == id);
             if (existing == null)
                 return NotFound();
 
@@ -108,14 +97,11 @@ namespace DailyNotes.Api.Controllers
             return NoContent();
         }
 
-        /// <summary>DELETE /api/pay-periods/{id}</summary>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var tenantId = CurrentTenantId;
-            var userId = CurrentUserId;
-            var period = await _context.PayPeriods
-                .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId && p.UserId == userId);
+            var period = await TenantScoped(_context.PayPeriods)
+                .FirstOrDefaultAsync(p => p.Id == id);
             if (period == null)
                 return NotFound();
 

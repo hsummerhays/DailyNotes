@@ -29,16 +29,17 @@ namespace DailyNotes.Api.Controllers
                 return BadRequest(new { message = "Search query 'q' is required." });
 
             var tenantId = CurrentTenantId;
-            var userId = CurrentUserId;
             var searchTerm = q.ToLower();
             var results = new Dictionary<string, object>();
 
             // Search Work Notes
             if (type == "all" || type == "notes")
             {
-                var notesQuery = _context.WorkNotes
-                    .Where(n => n.TenantId == tenantId && n.UserId == userId)
-                    .AsQueryable();
+                var notesQuery = TenantScoped(_context.WorkNotes).AsQueryable();
+
+                // Simple client-side like filtering for now as content is JSON
+                // Ideally this would be specialized search index or DB function
+                // For now just basic date filtering and perhaps fetching recent
 
                 if (dateFrom.HasValue)
                 {
@@ -51,11 +52,22 @@ namespace DailyNotes.Api.Controllers
                     notesQuery = notesQuery.Where(n => n.NoteDate <= dTo);
                 }
 
-                // Basic text search on serialized content
+                // If q is provided, we can't easily search JSON content in basic SQL efficiently without specific setup
+                // We'll load recent notes and filter in memory for this simple implementation
+                // OR we rely on a specific column if available.
+                // Assuming we just return date-filtered list for now if no text search capability in DB
+
                 var notes = await notesQuery
                     .OrderByDescending(n => n.NoteDate)
                     .Take(50)
                     .ToListAsync();
+
+                // In-memory filter for 'q' on Content if needed
+                if (!string.IsNullOrEmpty(q))
+                {
+                    var term = q.ToLower();
+                    notes = notes.Where(n => n.Content.RootElement.ToString().ToLower().Contains(term)).ToList();
+                }
 
                 results["workNotes"] = notes;
             }
@@ -63,9 +75,8 @@ namespace DailyNotes.Api.Controllers
             // Search Work Tasks
             if (type == "all" || type == "tasks")
             {
-                var tasksQuery = _context.WorkTasks
-                    .Where(t => t.TenantId == tenantId && t.UserId == userId
-                        && t.Name.ToLower().Contains(searchTerm));
+                var tasksQuery = TenantScoped(_context.WorkTasks)
+                    .Where(t => t.Name.ToLower().Contains(searchTerm));
 
                 if (dateFrom.HasValue)
                     tasksQuery = tasksQuery.Where(t => t.CreatedAt >= dateFrom.Value);
@@ -81,20 +92,22 @@ namespace DailyNotes.Api.Controllers
             // Search Topics
             if (type == "all" || type == "topics")
             {
-                var topicsQuery = _context.Topics
-                    .Where(t => t.TenantId == tenantId
-                        && (t.Title.ToLower().Contains(searchTerm)
-                             || (t.Description != null && t.Description.ToLower().Contains(searchTerm))));
+                var topicsQuery = TenantScoped(_context.Topics)
+                    .Where(t => t.Title.ToLower().Contains(searchTerm)
+                             || (t.Description != null && t.Description.ToLower().Contains(searchTerm)));
 
                 results["topics"] = await topicsQuery
                     .OrderBy(t => t.Title)
                     .Take(50)
                     .ToListAsync();
 
-                // Also search topic notes (scoped through their parent topic's tenant)
+                // Also search topic notes (scoped through their parent topic)
+                // We must ensure the topic itself is accessible to the user
+                var accessibleTopicIds = TenantScoped(_context.Topics).Select(t => t.Id);
+
                 var topicNotesQuery = _context.TopicNotes
                     .Where(n => (n.Title != null && n.Title.ToLower().Contains(searchTerm))
-                        && _context.Topics.Any(t => t.Id == n.TopicId && t.TenantId == tenantId));
+                        && accessibleTopicIds.Contains(n.TopicId));
 
                 results["topicNotes"] = await topicNotesQuery
                     .OrderByDescending(n => n.CreatedAt)

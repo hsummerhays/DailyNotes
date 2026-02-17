@@ -1,8 +1,9 @@
 using System;
+using DailyNotes.Core.Interfaces;
 
 namespace DailyNotes.Core.Entities
 {
-    public class Tag
+    public class Tag : IHasTenant
     {
         public int Id { get; set; }
         public int TenantId { get; set; }

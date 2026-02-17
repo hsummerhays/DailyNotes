@@ -4,7 +4,7 @@ DailyNotes is a cloud-native note-taking application designed for flexibility an
 
 ## Prerequisites
 
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop) (Optional, but recommended for consistent environment)
 - [VS Code](https://code.visualstudio.com/) (Recommended)
 
