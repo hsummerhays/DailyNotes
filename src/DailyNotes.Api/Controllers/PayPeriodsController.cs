@@ -99,6 +99,9 @@ namespace DailyNotes.Api.Controllers
 
             existing.PeriodStartDate = payPeriod.PeriodStartDate;
             existing.PeriodEndDate = payPeriod.PeriodEndDate;
+            existing.Holidays = payPeriod.Holidays;
+            existing.PtoReported = payPeriod.PtoReported;
+            existing.PtoDaysOfMonth = payPeriod.PtoDaysOfMonth;
 
             await _context.SaveChangesAsync();
 
