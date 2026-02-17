@@ -9,7 +9,7 @@ namespace DailyNotes.Api.Controllers
     [ApiController]
     [Route("api/quizzes")]
     [Authorize]
-    public class QuizzesController : ControllerBase
+    public class QuizzesController : ApiControllerBase
     {
         private readonly DailyNotesDbContext _context;
 
@@ -24,7 +24,10 @@ namespace DailyNotes.Api.Controllers
             [FromQuery] int? topicId,
             [FromQuery] int? difficulty)
         {
-            var query = _context.Quizzes.AsQueryable();
+            var tenantId = CurrentTenantId;
+            var query = _context.Quizzes
+                .Where(q => q.TenantId == tenantId)
+                .AsQueryable();
 
             if (topicId.HasValue)
                 query = query.Where(q => q.TopicId == topicId.Value);
@@ -39,7 +42,9 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<object>> GetById(int id)
         {
-            var quiz = await _context.Quizzes.FindAsync(id);
+            var tenantId = CurrentTenantId;
+            var quiz = await _context.Quizzes
+                .FirstOrDefaultAsync(q => q.Id == id && q.TenantId == tenantId);
             if (quiz == null)
                 return NotFound();
 
@@ -68,6 +73,7 @@ namespace DailyNotes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<Quiz>> Create(Quiz quiz)
         {
+            quiz.TenantId = CurrentTenantId;
             quiz.CreatedAt = DateTime.UtcNow;
 
             _context.Quizzes.Add(quiz);
@@ -82,7 +88,9 @@ namespace DailyNotes.Api.Controllers
             if (id != quiz.Id)
                 return BadRequest(new { message = "ID mismatch." });
 
-            var existing = await _context.Quizzes.FindAsync(id);
+            var tenantId = CurrentTenantId;
+            var existing = await _context.Quizzes
+                .FirstOrDefaultAsync(q => q.Id == id && q.TenantId == tenantId);
             if (existing == null)
                 return NotFound();
 
@@ -98,7 +106,9 @@ namespace DailyNotes.Api.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var quiz = await _context.Quizzes.FindAsync(id);
+            var tenantId = CurrentTenantId;
+            var quiz = await _context.Quizzes
+                .FirstOrDefaultAsync(q => q.Id == id && q.TenantId == tenantId);
             if (quiz == null)
                 return NotFound();
 
@@ -112,7 +122,9 @@ namespace DailyNotes.Api.Controllers
         [HttpPost("{quizId}/questions")]
         public async Task<ActionResult<QuizQuestion>> AddQuestion(int quizId, QuizQuestion question)
         {
-            var quiz = await _context.Quizzes.FindAsync(quizId);
+            var tenantId = CurrentTenantId;
+            var quiz = await _context.Quizzes
+                .FirstOrDefaultAsync(q => q.Id == quizId && q.TenantId == tenantId);
             if (quiz == null)
                 return NotFound(new { message = "Quiz not found." });
 

@@ -9,7 +9,7 @@ namespace DailyNotes.Api.Controllers
     [ApiController]
     [Route("api/assignments")]
     [Authorize]
-    public class AssignmentsController : ControllerBase
+    public class AssignmentsController : ApiControllerBase
     {
         private readonly DailyNotesDbContext _context;
 
@@ -25,7 +25,15 @@ namespace DailyNotes.Api.Controllers
             [FromQuery] string? status,
             [FromQuery] DateTime? dueDate)
         {
-            var query = _context.Assignments.AsQueryable();
+            var tenantId = CurrentTenantId;
+            var userId = CurrentUserId;
+            // Scope assignments through their parent course
+            var allowedCourseIds = _context.Courses
+                .Where(c => c.TenantId == tenantId && c.UserId == userId)
+                .Select(c => c.Id);
+            var query = _context.Assignments
+                .Where(a => allowedCourseIds.Contains(a.CourseId))
+                .AsQueryable();
 
             if (courseId.HasValue)
                 query = query.Where(a => a.CourseId == courseId.Value);

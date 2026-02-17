@@ -33,7 +33,7 @@ builder.Services.AddDbContext<DailyNotesDbContext>(options =>
     options.UseNpgsql(connectionString));
 
 // Identity
-builder.Services.AddIdentityCore<IdentityUser>(options => options.SignIn.RequireConfirmedAccount = true)
+builder.Services.AddIdentityCore<IdentityUser>(options => options.SignIn.RequireConfirmedAccount = false)
     .AddEntityFrameworkStores<DailyNotesDbContext>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

@@ -9,7 +9,7 @@ namespace DailyNotes.Api.Controllers
     [ApiController]
     [Route("api/quiz-attempts")]
     [Authorize]
-    public class QuizAttemptsController : ControllerBase
+    public class QuizAttemptsController : ApiControllerBase
     {
         private readonly DailyNotesDbContext _context;
 
@@ -22,7 +22,10 @@ namespace DailyNotes.Api.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<QuizAttempt>>> GetAll([FromQuery] int? quizId)
         {
-            var query = _context.QuizAttempts.AsQueryable();
+            var userId = CurrentUserId;
+            var query = _context.QuizAttempts
+                .Where(a => a.UserId == userId)
+                .AsQueryable();
 
             if (quizId.HasValue)
                 query = query.Where(a => a.QuizId == quizId.Value);
@@ -49,14 +52,16 @@ namespace DailyNotes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<QuizAttempt>> Submit([FromBody] QuizSubmissionDto submission)
         {
-            var quiz = await _context.Quizzes.FindAsync(submission.QuizId);
+            var tenantId = CurrentTenantId;
+            var quiz = await _context.Quizzes
+                .FirstOrDefaultAsync(q => q.Id == submission.QuizId && q.TenantId == tenantId);
             if (quiz == null)
                 return NotFound(new { message = "Quiz not found." });
 
             var attempt = new QuizAttempt
             {
                 QuizId = submission.QuizId,
-                UserId = submission.UserId,
+                UserId = CurrentUserId,
                 StartedAt = DateTime.UtcNow
             };
 
@@ -93,7 +98,6 @@ namespace DailyNotes.Api.Controllers
     public class QuizSubmissionDto
     {
         public int QuizId { get; set; }
-        public string UserId { get; set; } = string.Empty;
         public List<QuizAnswerDto> Answers { get; set; } = new();
     }
 

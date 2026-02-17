@@ -25,7 +25,7 @@ export default function PayPeriodsPage() {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <div>
                                         <span style={{ fontWeight: 600 }}>
-                                            {format(new Date(period.startDate), 'MMM d')} — {format(new Date(period.endDate), 'MMM d, yyyy')}
+                                            {format(new Date(period.periodStartDate), 'MMM d')} — {format(new Date(period.periodEndDate), 'MMM d, yyyy')}
                                         </span>
                                     </div>
                                     <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>

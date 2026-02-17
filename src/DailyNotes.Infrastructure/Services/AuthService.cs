@@ -98,19 +98,16 @@ namespace DailyNotes.Infrastructure.Services
 
         public async Task<AuthResponseDto> RefreshTokenAsync(string refreshToken)
         {
-            // Find user by stored refresh token
-            var users = _userManager.Users.ToList();
-            IdentityUser? foundUser = null;
+            // Look up the user directly via the asp_net_user_tokens table — O(1) indexed query
+            var tokenRecord = await _context.UserTokens
+                .FirstOrDefaultAsync(t => t.LoginProvider == "DailyNotes"
+                                       && t.Name == "RefreshToken"
+                                       && t.Value == refreshToken);
 
-            foreach (var u in users)
-            {
-                var storedToken = await _userManager.GetAuthenticationTokenAsync(u, "DailyNotes", "RefreshToken");
-                if (storedToken == refreshToken)
-                {
-                    foundUser = u;
-                    break;
-                }
-            }
+            if (tokenRecord == null)
+                throw new Exception("Invalid refresh token.");
+
+            var foundUser = await _userManager.FindByIdAsync(tokenRecord.UserId);
 
             if (foundUser == null)
                 throw new Exception("Invalid refresh token.");

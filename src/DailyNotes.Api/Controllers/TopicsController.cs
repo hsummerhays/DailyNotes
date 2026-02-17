@@ -9,7 +9,7 @@ namespace DailyNotes.Api.Controllers
     [ApiController]
     [Route("api/topics")]
     [Authorize]
-    public class TopicsController : ControllerBase
+    public class TopicsController : ApiControllerBase
     {
         private readonly DailyNotesDbContext _context;
 
@@ -22,7 +22,10 @@ namespace DailyNotes.Api.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Topic>>> GetAll([FromQuery] int? parentId)
         {
-            var query = _context.Topics.AsQueryable();
+            var tenantId = CurrentTenantId;
+            var query = _context.Topics
+                .Where(t => t.TenantId == tenantId)
+                .AsQueryable();
 
             if (parentId.HasValue)
                 query = query.Where(t => t.ParentTopicId == parentId.Value);
@@ -36,7 +39,9 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<Topic>> GetById(int id)
         {
-            var topic = await _context.Topics.FindAsync(id);
+            var tenantId = CurrentTenantId;
+            var topic = await _context.Topics
+                .FirstOrDefaultAsync(t => t.Id == id && t.TenantId == tenantId);
             if (topic == null)
                 return NotFound();
 
@@ -47,8 +52,9 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("{id}/children")]
         public async Task<ActionResult<IEnumerable<Topic>>> GetChildren(int id)
         {
+            var tenantId = CurrentTenantId;
             return await _context.Topics
-                .Where(t => t.ParentTopicId == id)
+                .Where(t => t.ParentTopicId == id && t.TenantId == tenantId)
                 .OrderBy(t => t.Title)
                 .ToListAsync();
         }
@@ -57,7 +63,9 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("{id}/notes")]
         public async Task<ActionResult<IEnumerable<TopicNote>>> GetTopicNotes(int id)
         {
-            var topic = await _context.Topics.FindAsync(id);
+            var tenantId = CurrentTenantId;
+            var topic = await _context.Topics
+                .FirstOrDefaultAsync(t => t.Id == id && t.TenantId == tenantId);
             if (topic == null)
                 return NotFound();
 
@@ -70,6 +78,7 @@ namespace DailyNotes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<Topic>> Create(Topic topic)
         {
+            topic.TenantId = CurrentTenantId;
             topic.CreatedAt = DateTime.UtcNow;
             topic.UpdatedAt = DateTime.UtcNow;
 
@@ -85,7 +94,9 @@ namespace DailyNotes.Api.Controllers
             if (id != topic.Id)
                 return BadRequest(new { message = "ID mismatch." });
 
-            var existing = await _context.Topics.FindAsync(id);
+            var tenantId = CurrentTenantId;
+            var existing = await _context.Topics
+                .FirstOrDefaultAsync(t => t.Id == id && t.TenantId == tenantId);
             if (existing == null)
                 return NotFound();
 
@@ -106,7 +117,9 @@ namespace DailyNotes.Api.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var topic = await _context.Topics.FindAsync(id);
+            var tenantId = CurrentTenantId;
+            var topic = await _context.Topics
+                .FirstOrDefaultAsync(t => t.Id == id && t.TenantId == tenantId);
             if (topic == null)
                 return NotFound();
 

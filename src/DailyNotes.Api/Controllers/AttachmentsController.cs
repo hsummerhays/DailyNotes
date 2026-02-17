@@ -9,7 +9,7 @@ namespace DailyNotes.Api.Controllers
     [ApiController]
     [Route("api/attachments")]
     [Authorize]
-    public class AttachmentsController : ControllerBase
+    public class AttachmentsController : ApiControllerBase
     {
         private readonly DailyNotesDbContext _context;
 
@@ -24,7 +24,11 @@ namespace DailyNotes.Api.Controllers
             [FromQuery] string? itemType,
             [FromQuery] int? itemId)
         {
-            var query = _context.Attachments.AsQueryable();
+            var tenantId = CurrentTenantId;
+            var userId = CurrentUserId;
+            var query = _context.Attachments
+                .Where(a => a.TenantId == tenantId && a.UserId == userId)
+                .AsQueryable();
 
             if (!string.IsNullOrEmpty(itemType))
                 query = query.Where(a => a.ItemType == itemType);
@@ -38,7 +42,10 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<Attachment>> GetById(int id)
         {
-            var attachment = await _context.Attachments.FindAsync(id);
+            var tenantId = CurrentTenantId;
+            var userId = CurrentUserId;
+            var attachment = await _context.Attachments
+                .FirstOrDefaultAsync(a => a.Id == id && a.TenantId == tenantId && a.UserId == userId);
             if (attachment == null)
                 return NotFound();
 
@@ -49,6 +56,8 @@ namespace DailyNotes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<Attachment>> Create(Attachment attachment)
         {
+            attachment.TenantId = CurrentTenantId;
+            attachment.UserId = CurrentUserId;
             attachment.CreatedAt = DateTime.UtcNow;
 
             _context.Attachments.Add(attachment);
@@ -60,7 +69,10 @@ namespace DailyNotes.Api.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var attachment = await _context.Attachments.FindAsync(id);
+            var tenantId = CurrentTenantId;
+            var userId = CurrentUserId;
+            var attachment = await _context.Attachments
+                .FirstOrDefaultAsync(a => a.Id == id && a.TenantId == tenantId && a.UserId == userId);
             if (attachment == null)
                 return NotFound();
 

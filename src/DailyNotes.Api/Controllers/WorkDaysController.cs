@@ -9,7 +9,7 @@ namespace DailyNotes.Api.Controllers
     [ApiController]
     [Route("api/work-days")]
     [Authorize]
-    public class WorkDaysController : ControllerBase
+    public class WorkDaysController : ApiControllerBase
     {
         private readonly DailyNotesDbContext _context;
 
@@ -26,7 +26,11 @@ namespace DailyNotes.Api.Controllers
             [FromQuery] DateOnly? to,
             [FromQuery] bool all = false)
         {
-            var query = _context.WorkDays.AsQueryable();
+            var tenantId = CurrentTenantId;
+            var userId = CurrentUserId;
+            var query = _context.WorkDays
+                .Where(w => w.TenantId == tenantId && w.UserId == userId)
+                .AsQueryable();
 
             if (all)
             {
@@ -59,10 +63,12 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("today")]
         public async Task<ActionResult<WorkDay>> GetToday()
         {
+            var tenantId = CurrentTenantId;
+            var userId = CurrentUserId;
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
             var workDay = await _context.WorkDays
                 .Include(w => w.Notes)
-                .FirstOrDefaultAsync(w => w.WorkDate == today);
+                .FirstOrDefaultAsync(w => w.TenantId == tenantId && w.UserId == userId && w.WorkDate == today);
 
             if (workDay == null)
                 return NotFound(new { message = "No work day entry for today." });
@@ -74,9 +80,11 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<WorkDay>> GetById(int id)
         {
+            var tenantId = CurrentTenantId;
+            var userId = CurrentUserId;
             var workDay = await _context.WorkDays
                 .Include(w => w.Notes)
-                .FirstOrDefaultAsync(w => w.Id == id);
+                .FirstOrDefaultAsync(w => w.Id == id && w.TenantId == tenantId && w.UserId == userId);
 
             if (workDay == null)
                 return NotFound();
@@ -88,6 +96,8 @@ namespace DailyNotes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<WorkDay>> Create(WorkDay workDay)
         {
+            workDay.TenantId = CurrentTenantId;
+            workDay.UserId = CurrentUserId;
             workDay.CreatedAt = DateTime.UtcNow;
             workDay.UpdatedAt = DateTime.UtcNow;
 
@@ -104,7 +114,10 @@ namespace DailyNotes.Api.Controllers
             if (id != workDay.Id)
                 return BadRequest(new { message = "ID mismatch." });
 
-            var existing = await _context.WorkDays.FindAsync(id);
+            var tenantId = CurrentTenantId;
+            var userId = CurrentUserId;
+            var existing = await _context.WorkDays
+                .FirstOrDefaultAsync(w => w.Id == id && w.TenantId == tenantId && w.UserId == userId);
             if (existing == null)
                 return NotFound();
 
@@ -128,7 +141,10 @@ namespace DailyNotes.Api.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var workDay = await _context.WorkDays.FindAsync(id);
+            var tenantId = CurrentTenantId;
+            var userId = CurrentUserId;
+            var workDay = await _context.WorkDays
+                .FirstOrDefaultAsync(w => w.Id == id && w.TenantId == tenantId && w.UserId == userId);
             if (workDay == null)
                 return NotFound();
 

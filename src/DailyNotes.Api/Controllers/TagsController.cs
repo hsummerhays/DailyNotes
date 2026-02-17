@@ -9,7 +9,7 @@ namespace DailyNotes.Api.Controllers
     [ApiController]
     [Route("api/tags")]
     [Authorize]
-    public class TagsController : ControllerBase
+    public class TagsController : ApiControllerBase
     {
         private readonly DailyNotesDbContext _context;
 
@@ -22,13 +22,19 @@ namespace DailyNotes.Api.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Tag>>> GetAll()
         {
-            return await _context.Tags.OrderBy(t => t.Name).ToListAsync();
+            var tenantId = CurrentTenantId;
+            return await _context.Tags
+                .Where(t => t.TenantId == tenantId)
+                .OrderBy(t => t.Name)
+                .ToListAsync();
         }
 
         [HttpGet("{id}")]
         public async Task<ActionResult<Tag>> GetById(int id)
         {
-            var tag = await _context.Tags.FindAsync(id);
+            var tenantId = CurrentTenantId;
+            var tag = await _context.Tags
+                .FirstOrDefaultAsync(t => t.Id == id && t.TenantId == tenantId);
             if (tag == null)
                 return NotFound();
 
@@ -38,6 +44,7 @@ namespace DailyNotes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<Tag>> Create(Tag tag)
         {
+            tag.TenantId = CurrentTenantId;
             _context.Tags.Add(tag);
             await _context.SaveChangesAsync();
 
@@ -50,7 +57,9 @@ namespace DailyNotes.Api.Controllers
             if (id != tag.Id)
                 return BadRequest(new { message = "ID mismatch." });
 
-            var existing = await _context.Tags.FindAsync(id);
+            var tenantId = CurrentTenantId;
+            var existing = await _context.Tags
+                .FirstOrDefaultAsync(t => t.Id == id && t.TenantId == tenantId);
             if (existing == null)
                 return NotFound();
 
@@ -65,7 +74,9 @@ namespace DailyNotes.Api.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var tag = await _context.Tags.FindAsync(id);
+            var tenantId = CurrentTenantId;
+            var tag = await _context.Tags
+                .FirstOrDefaultAsync(t => t.Id == id && t.TenantId == tenantId);
             if (tag == null)
                 return NotFound();
 
@@ -79,7 +90,9 @@ namespace DailyNotes.Api.Controllers
         [HttpPost("{tagId}/items")]
         public async Task<IActionResult> TagItem(int tagId, [FromBody] ItemTag itemTag)
         {
-            var tag = await _context.Tags.FindAsync(tagId);
+            var tenantId = CurrentTenantId;
+            var tag = await _context.Tags
+                .FirstOrDefaultAsync(t => t.Id == tagId && t.TenantId == tenantId);
             if (tag == null)
                 return NotFound(new { message = "Tag not found." });
 

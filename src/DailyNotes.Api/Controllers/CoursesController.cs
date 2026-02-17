@@ -9,7 +9,7 @@ namespace DailyNotes.Api.Controllers
     [ApiController]
     [Route("api/courses")]
     [Authorize]
-    public class CoursesController : ControllerBase
+    public class CoursesController : ApiControllerBase
     {
         private readonly DailyNotesDbContext _context;
 
@@ -22,7 +22,11 @@ namespace DailyNotes.Api.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Course>>> GetAll([FromQuery] string? semester)
         {
-            var query = _context.Courses.AsQueryable();
+            var tenantId = CurrentTenantId;
+            var userId = CurrentUserId;
+            var query = _context.Courses
+                .Where(c => c.TenantId == tenantId && c.UserId == userId)
+                .AsQueryable();
 
             if (!string.IsNullOrEmpty(semester))
                 query = query.Where(c => c.Semester == semester);
@@ -33,9 +37,11 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<Course>> GetById(int id)
         {
+            var tenantId = CurrentTenantId;
+            var userId = CurrentUserId;
             var course = await _context.Courses
                 .Include(c => c.Assignments)
-                .FirstOrDefaultAsync(c => c.Id == id);
+                .FirstOrDefaultAsync(c => c.Id == id && c.TenantId == tenantId && c.UserId == userId);
 
             if (course == null)
                 return NotFound();
@@ -46,6 +52,8 @@ namespace DailyNotes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<Course>> Create(Course course)
         {
+            course.TenantId = CurrentTenantId;
+            course.UserId = CurrentUserId;
             course.CreatedAt = DateTime.UtcNow;
             course.UpdatedAt = DateTime.UtcNow;
 
@@ -61,7 +69,10 @@ namespace DailyNotes.Api.Controllers
             if (id != course.Id)
                 return BadRequest(new { message = "ID mismatch." });
 
-            var existing = await _context.Courses.FindAsync(id);
+            var tenantId = CurrentTenantId;
+            var userId = CurrentUserId;
+            var existing = await _context.Courses
+                .FirstOrDefaultAsync(c => c.Id == id && c.TenantId == tenantId && c.UserId == userId);
             if (existing == null)
                 return NotFound();
 
@@ -86,7 +97,10 @@ namespace DailyNotes.Api.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var course = await _context.Courses.FindAsync(id);
+            var tenantId = CurrentTenantId;
+            var userId = CurrentUserId;
+            var course = await _context.Courses
+                .FirstOrDefaultAsync(c => c.Id == id && c.TenantId == tenantId && c.UserId == userId);
             if (course == null)
                 return NotFound();
 

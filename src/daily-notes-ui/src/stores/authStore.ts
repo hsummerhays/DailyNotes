@@ -86,7 +86,28 @@ export const useAuthStore = create<AuthState>((set) => ({
         const token = localStorage.getItem('token');
         const refreshToken = localStorage.getItem('refreshToken');
         if (token) {
-            set({ token, refreshToken, isAuthenticated: true });
+            try {
+                // Decode the JWT payload (base64url) to restore claims without a network call
+                const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+                const exp = payload.exp as number | undefined;
+                // Treat token as invalid if it has already expired
+                if (exp && Date.now() / 1000 > exp) {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('refreshToken');
+                    return;
+                }
+                set({
+                    token,
+                    refreshToken,
+                    tenantId: payload['tenant_id'] ?? null,
+                    role: payload['role'] ?? payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] ?? null,
+                    isAuthenticated: true,
+                });
+            } catch {
+                // Malformed token — clear it
+                localStorage.removeItem('token');
+                localStorage.removeItem('refreshToken');
+            }
         }
     },
 }));
