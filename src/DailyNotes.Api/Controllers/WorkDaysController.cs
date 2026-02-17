@@ -27,10 +27,6 @@ namespace DailyNotes.Api.Controllers
             [FromQuery] bool all = false)
         {
             var query = TenantScoped(_context.WorkDays).AsQueryable();
-            Console.WriteLine($"DEBUG: Inside GetAll. TenantId={CurrentTenantId}, UserId={CurrentUserId}");
-            Console.WriteLine($"DEBUG: Total WorkDays in DB: {_context.WorkDays.Count()}");
-            Console.WriteLine($"DEBUG: TenantScoped count: {query.Count()}");
-            foreach (var w in query) Console.WriteLine($"DEBUG: WorkDay ID={w.Id}, Tenant={w.TenantId}, User={w.UserId}");
 
             if (all)
             {

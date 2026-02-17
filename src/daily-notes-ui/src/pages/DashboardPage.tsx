@@ -16,13 +16,13 @@ export default function DashboardPage() {
 
     const { data: today } = useQuery({
         queryKey: ['workday-today'],
-        queryFn: () => api.get('/work-days/today').then((r) => r.data),
+        queryFn: () => api.get('/work-days/today').then((r) => r.data).catch(() => null),
         retry: false,
     });
 
     const { data: tasks } = useQuery({
         queryKey: ['tasks-active'],
-        queryFn: () => api.get('/work-tasks?status=in-progress').then((r) => r.data),
+        queryFn: () => api.get('/work-tasks?status=in_progress').then((r) => r.data),
     });
 
     const { data: overdue } = useQuery({

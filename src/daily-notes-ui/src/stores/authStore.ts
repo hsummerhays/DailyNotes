@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import api from '../lib/api';
+import { setOnAuthInvalid } from '../lib/authEvents';
 
 interface AuthState {
     token: string | null;
@@ -111,3 +112,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         }
     },
 }));
+
+setOnAuthInvalid(() => {
+    useAuthStore.getState().logout();
+});

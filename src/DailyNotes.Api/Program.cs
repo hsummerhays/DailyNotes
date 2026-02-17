@@ -9,9 +9,13 @@ using System.Text;
 using System.Net;
 using DailyNotes.Core.Interfaces;
 using DailyNotes.Infrastructure.Services;
+using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
-File.WriteAllText("env_debug.txt", $"Environment: {builder.Environment.EnvironmentName}\n");
+if (builder.Environment.IsDevelopment())
+{
+    File.WriteAllText("env_debug.txt", $"Environment: {builder.Environment.EnvironmentName}\n");
+}
 
 // Add services to the container.
 
@@ -24,7 +28,25 @@ builder.Services.AddControllers()
 
 // OpenAPI / Swagger
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "DailyNotes API", Version = "v1" });
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.ApiKey,
+        Scheme = "Bearer"
+    });
+    c.AddSecurityRequirement(_ => new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecuritySchemeReference("Bearer", null),
+            new List<string>()
+        }
+    });
+});
 
 // Database Context
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
@@ -103,7 +125,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAuthentication();
 app.UseAuthorization();

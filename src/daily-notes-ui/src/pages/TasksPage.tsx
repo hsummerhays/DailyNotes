@@ -5,7 +5,7 @@ import { format } from 'date-fns';
 import Modal from '../components/Modal';
 import { useToast, ToastContainer } from '../components/Toast';
 
-const STATUS_OPTIONS = ['all', 'pending', 'in_progress', 'completed', 'on_hold'];
+import { TASK_STATUS, TASK_STATUS_OPTIONS, type TaskStatusFilter } from '../lib/taskStatus';
 
 interface Task {
     id?: number;
@@ -23,7 +23,7 @@ const EMPTY: Task = { name: '', status: 'pending', comments: '', dueDate: '', st
 export default function TasksPage() {
     const qc = useQueryClient();
     const { toasts, toast, dismiss } = useToast();
-    const [status, setStatus] = useState('all');
+    const [status, setStatus] = useState<TaskStatusFilter>('all');
     const [editing, setEditing] = useState<Task | null>(null);
     const [isNew, setIsNew] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState<Task | null>(null);
@@ -89,7 +89,7 @@ export default function TasksPage() {
                     <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>Manage your work tasks</p>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                    {STATUS_OPTIONS.map((s) => (
+                    {TASK_STATUS_OPTIONS.map((s) => (
                         <button key={s} className={`btn ${status === s ? 'btn-primary' : 'btn-secondary'}`}
                             onClick={() => setStatus(s)}
                             style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
@@ -129,9 +129,9 @@ export default function TasksPage() {
                                                 Due {format(new Date(task.dueDate), 'MMM d')}
                                             </span>
                                         )}
-                                        <span className={`badge ${task.status === 'completed' ? 'badge-success' :
-                                            task.status === 'in_progress' ? 'badge-primary' :
-                                            task.status === 'on_hold' ? 'badge-warning' : 'badge-warning'}`}>
+                                        <span className={`badge ${task.status === TASK_STATUS.completed ? 'badge-success' :
+                                            task.status === TASK_STATUS.inProgress ? 'badge-primary' :
+                                            task.status === TASK_STATUS.onHold ? 'badge-warning' : 'badge-warning'}`}>
                                             {task.status.replace('_', ' ')}
                                         </span>
                                         <button className="btn btn-secondary" style={{ padding: '0.3rem 0.7rem', fontSize: '0.75rem' }}
@@ -162,10 +162,10 @@ export default function TasksPage() {
                             <div>
                                 <label style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '0.375rem' }}>Status</label>
                                 <select className="input" name="status" defaultValue={editing.status}>
-                                    <option value="pending">Pending</option>
-                                    <option value="in_progress">In Progress</option>
-                                    <option value="completed">Completed</option>
-                                    <option value="on_hold">On Hold</option>
+                                    <option value={TASK_STATUS.pending}>Pending</option>
+                                    <option value={TASK_STATUS.inProgress}>In Progress</option>
+                                    <option value={TASK_STATUS.completed}>Completed</option>
+                                    <option value={TASK_STATUS.onHold}>On Hold</option>
                                 </select>
                             </div>
                             <div>
