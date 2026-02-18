@@ -65,7 +65,7 @@ namespace DailyNotes.Api.Controllers
                 .FirstOrDefaultAsync(w => w.WorkDate == today);
 
             if (workDay == null)
-                return NotFound(new { message = "No work day entry for today." });
+                return Ok(null);
 
             return workDay;
         }
