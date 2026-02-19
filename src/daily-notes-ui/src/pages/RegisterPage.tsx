@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 
@@ -6,8 +6,12 @@ export default function RegisterPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [displayName, setDisplayName] = useState('');
-    const { register, isLoading, error } = useAuthStore();
+    const { register, isLoading, error, isAuthenticated } = useAuthStore();
     const navigate = useNavigate();
+
+    useEffect(() => {
+        if (isAuthenticated) navigate('/', { replace: true });
+    }, [isAuthenticated, navigate]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -75,6 +79,7 @@ export default function RegisterPage() {
                             placeholder="John Doe"
                             required
                             autoFocus
+                            autoComplete="name"
                         />
                     </div>
 
@@ -89,6 +94,7 @@ export default function RegisterPage() {
                             onChange={(e) => setEmail(e.target.value)}
                             placeholder="you@example.com"
                             required
+                            autoComplete="email"
                         />
                     </div>
 
@@ -104,6 +110,7 @@ export default function RegisterPage() {
                             placeholder="••••••••"
                             required
                             minLength={8}
+                            autoComplete="new-password"
                         />
                     </div>
 

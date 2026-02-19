@@ -16,12 +16,61 @@ interface AuthState {
     hydrate: () => void;
 }
 
+const getInitialState = () => {
+    try {
+        const token = localStorage.getItem('token');
+        const refreshToken = localStorage.getItem('refreshToken');
+        
+        if (!token) {
+            return {
+                token: null,
+                refreshToken: null,
+                tenantId: null,
+                role: null,
+                isAuthenticated: false,
+            };
+        }
+
+        // Decode the JWT payload (base64url) to restore claims without a network call
+        const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+        const exp = payload.exp as number | undefined;
+        
+        // Treat token as invalid if it has already expired
+        if (exp && Date.now() / 1000 > exp) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('refreshToken');
+            return {
+                token: null,
+                refreshToken: null,
+                tenantId: null,
+                role: null,
+                isAuthenticated: false,
+            };
+        }
+
+        return {
+            token,
+            refreshToken,
+            tenantId: payload['tenant_id'] ?? null,
+            role: payload['role'] ?? payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] ?? null,
+            isAuthenticated: true,
+        };
+    } catch (error) {
+        console.error('Failed to hydrate auth state:', error);
+        return {
+            token: null,
+            refreshToken: null,
+            tenantId: null,
+            role: null,
+            isAuthenticated: false,
+        };
+    }
+};
+
+const initialState = getInitialState();
+
 export const useAuthStore = create<AuthState>((set) => ({
-    token: null,
-    refreshToken: null,
-    tenantId: null,
-    role: null,
-    isAuthenticated: false,
+    ...initialState,
     isLoading: false,
     error: null,
 
@@ -84,32 +133,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     },
 
     hydrate: () => {
-        const token = localStorage.getItem('token');
-        const refreshToken = localStorage.getItem('refreshToken');
-        if (token) {
-            try {
-                // Decode the JWT payload (base64url) to restore claims without a network call
-                const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-                const exp = payload.exp as number | undefined;
-                // Treat token as invalid if it has already expired
-                if (exp && Date.now() / 1000 > exp) {
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('refreshToken');
-                    return;
-                }
-                set({
-                    token,
-                    refreshToken,
-                    tenantId: payload['tenant_id'] ?? null,
-                    role: payload['role'] ?? payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] ?? null,
-                    isAuthenticated: true,
-                });
-            } catch {
-                // Malformed token — clear it
-                localStorage.removeItem('token');
-                localStorage.removeItem('refreshToken');
-            }
-        }
+        const state = getInitialState();
+        set(state);
     },
 }));
 

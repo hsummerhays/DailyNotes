@@ -1,12 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const { login, isLoading, error } = useAuthStore();
+    const { login, isLoading, error, isAuthenticated } = useAuthStore();
     const navigate = useNavigate();
+
+    useEffect(() => {
+        if (isAuthenticated) navigate('/', { replace: true });
+    }, [isAuthenticated, navigate]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -74,6 +78,7 @@ export default function LoginPage() {
                             placeholder="you@example.com"
                             required
                             autoFocus
+                            autoComplete="email"
                         />
                     </div>
 
@@ -88,6 +93,7 @@ export default function LoginPage() {
                             onChange={(e) => setPassword(e.target.value)}
                             placeholder="••••••••"
                             required
+                            autoComplete="current-password"
                         />
                     </div>
 

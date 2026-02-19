@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 import { format } from 'date-fns';
@@ -55,6 +55,12 @@ export default function NotesPage() {
         queryFn: () => api.get('/work-tasks').then((r) => r.data),
     });
 
+    const taskMap = useMemo(() => {
+        const map: Record<number, string> = {};
+        tasks?.forEach((t: any) => { map[t.id] = t.name; });
+        return map;
+    }, [tasks]);
+
     const save = useMutation({
         mutationFn: (n: Note) =>
             n.id ? api.put(`/work-notes/${n.id}`, n) : api.post('/work-notes', n),
@@ -91,8 +97,8 @@ export default function NotesPage() {
         });
     };
 
-    const taskName = (id?: number | null) =>
-        id ? tasks?.find((t: any) => t.id === id)?.name ?? `Task #${id}` : null;
+    const getTaskName = (id?: number | null) =>
+        id ? taskMap[id] ?? `Task #${id}` : null;
 
     return (
         <>
@@ -123,7 +129,7 @@ export default function NotesPage() {
                                                 </span>
                                                 {note.workTaskId && (
                                                     <span style={{ fontSize: '0.75rem', color: 'var(--color-accent)' }}>
-                                                        {taskName(note.workTaskId)}
+                                                        {getTaskName(note.workTaskId)}
                                                     </span>
                                                 )}
                                                 {note.timeMinutes > 0 && (
