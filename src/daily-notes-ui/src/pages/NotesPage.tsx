@@ -86,11 +86,16 @@ export default function NotesPage() {
         e.preventDefault();
         if (!editing) return;
         const fd = new FormData(e.currentTarget);
+        const taskId = fd.get('taskId');
+        if (!taskId) {
+            toast('A linked task is required', 'error');
+            return;
+        }
         save.mutate({
             ...editing,
             noteDate: fd.get('noteDate') as string,
             content: { text: fd.get('text') as string },
-            workTaskId: fd.get('taskId') ? Number(fd.get('taskId')) : null,
+            workTaskId: Number(taskId),
             timeMinutes: Number(fd.get('timeMinutes')) || 0,
             isPinned: fd.get('isPinned') === 'on',
             visibility: fd.get('visibility') as string,
@@ -171,9 +176,9 @@ export default function NotesPage() {
                                     required />
                             </div>
                             <div>
-                                <label style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '0.375rem' }}>Linked Task</label>
-                                <select className="input" name="taskId" defaultValue={editing.workTaskId ?? ''}>
-                                    <option value="">None</option>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '0.375rem' }}>Linked Task *</label>
+                                <select className="input" name="taskId" defaultValue={editing.workTaskId ?? ''} required>
+                                    <option value="" disabled>Select a task…</option>
                                     {tasks?.map((t: any) => (
                                         <option key={t.id} value={t.id}>{t.name}</option>
                                     ))}

@@ -51,10 +51,32 @@ namespace DailyNotes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<WorkNote>> Create(WorkNote workNote)
         {
+            if (workNote.WorkTaskId == null)
+                return BadRequest(new { message = "A linked task is required." });
+
             workNote.TenantId = CurrentTenantId;
             workNote.UserId = CurrentUserId;
             workNote.CreatedAt = DateTime.UtcNow;
             workNote.UpdatedAt = DateTime.UtcNow;
+
+            // Ensure a WorkDay row exists for this date — work_notes has a FK on NoteDate → work_days.WorkDate
+            var workDayExists = await _context.WorkDays.AnyAsync(d =>
+                d.TenantId == workNote.TenantId &&
+                d.UserId == workNote.UserId &&
+                d.WorkDate == workNote.NoteDate);
+
+            if (!workDayExists)
+            {
+                _context.WorkDays.Add(new WorkDay
+                {
+                    TenantId = workNote.TenantId,
+                    UserId = workNote.UserId,
+                    WorkDate = workNote.NoteDate,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                });
+                await _context.SaveChangesAsync();
+            }
 
             _context.WorkNotes.Add(workNote);
             await _context.SaveChangesAsync();

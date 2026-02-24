@@ -62,6 +62,9 @@ namespace DailyNotes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<WorkTask>> Create(WorkTask workTask)
         {
+            if (workTask.ProjectId == null)
+                return BadRequest(new { message = "A linked project is required." });
+
             workTask.TenantId = CurrentTenantId;
             workTask.UserId = CurrentUserId;
             workTask.CreatedAt = DateTime.UtcNow;

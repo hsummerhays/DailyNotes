@@ -66,6 +66,11 @@ export default function TasksPage() {
         e.preventDefault();
         if (!editing) return;
         const fd = new FormData(e.currentTarget);
+        const projectId = fd.get('projectId');
+        if (!projectId) {
+            toast('A project is required', 'error');
+            return;
+        }
         save.mutate({
             ...editing,
             name: fd.get('name') as string,
@@ -73,7 +78,7 @@ export default function TasksPage() {
             comments: fd.get('comments') as string || undefined,
             dueDate: fd.get('dueDate') as string || undefined,
             startDate: fd.get('startDate') as string || undefined,
-            projectId: fd.get('projectId') ? Number(fd.get('projectId')) : null,
+            projectId: Number(projectId),
             isPinned: fd.get('isPinned') === 'on',
         });
     };
@@ -131,7 +136,7 @@ export default function TasksPage() {
                                         )}
                                         <span className={`badge ${task.status === TASK_STATUS.completed ? 'badge-success' :
                                             task.status === TASK_STATUS.inProgress ? 'badge-primary' :
-                                            task.status === TASK_STATUS.onHold ? 'badge-warning' : 'badge-warning'}`}>
+                                                task.status === TASK_STATUS.onHold ? 'badge-warning' : 'badge-warning'}`}>
                                             {task.status.replace('_', ' ')}
                                         </span>
                                         <button className="btn btn-secondary" style={{ padding: '0.3rem 0.7rem', fontSize: '0.75rem' }}
@@ -169,9 +174,9 @@ export default function TasksPage() {
                                 </select>
                             </div>
                             <div>
-                                <label style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '0.375rem' }}>Project</label>
-                                <select className="input" name="projectId" defaultValue={editing.projectId ?? ''}>
-                                    <option value="">None</option>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '0.375rem' }}>Project *</label>
+                                <select className="input" name="projectId" defaultValue={editing.projectId ?? ''} required>
+                                    <option value="" disabled>Select a project…</option>
                                     {projects?.map((p: any) => (
                                         <option key={p.id} value={p.id}>{p.name}</option>
                                     ))}
