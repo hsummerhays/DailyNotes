@@ -18,11 +18,13 @@ namespace DailyNotes.Api.Controllers
             _context = context;
         }
 
-        /// <summary>GET /api/work-notes?date=2025-01-15&taskId=1</summary>
+        /// <summary>GET /api/work-notes?date=2025-01-15&taskId=1&page=1&pageSize=20</summary>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<WorkNote>>> GetAll(
             [FromQuery] DateOnly? date,
-            [FromQuery] int? taskId)
+            [FromQuery] int? taskId,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20)
         {
             var query = TenantScoped(_context.WorkNotes).AsQueryable();
 
@@ -32,7 +34,12 @@ namespace DailyNotes.Api.Controllers
             if (taskId.HasValue)
                 query = query.Where(n => n.WorkTaskId == taskId.Value);
 
-            return await query.OrderByDescending(n => n.NoteDate).ToListAsync();
+            return await query
+                .OrderByDescending(n => n.NoteDate)
+                .ThenByDescending(n => n.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
         }
 
         /// <summary>GET /api/work-notes/{id}</summary>

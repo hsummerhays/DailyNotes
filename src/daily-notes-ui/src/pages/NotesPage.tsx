@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import api from '../lib/api';
 import { format } from 'date-fns';
 import Modal from '../components/Modal';
@@ -45,10 +45,35 @@ export default function NotesPage() {
     const [isNew, setIsNew] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState<Note | null>(null);
 
-    const { data: notes, isLoading } = useQuery({
+    const {
+        data: notesData,
+        isLoading,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage
+    } = useInfiniteQuery({
         queryKey: ['notes'],
-        queryFn: () => api.get('/work-notes').then((r) => r.data),
+        queryFn: ({ pageParam = 1 }) => api.get(`/work-notes?page=${pageParam}&pageSize=20`).then(r => r.data),
+        getNextPageParam: (lastPage, allPages) => lastPage.length === 20 ? allPages.length + 1 : undefined,
+        initialPageParam: 1,
     });
+
+    const notes = useMemo(() => notesData?.pages.flat() || [], [notesData]);
+
+    const loadMoreRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+                    fetchNextPage();
+                }
+            },
+            { threshold: 1.0 }
+        );
+        if (loadMoreRef.current) observer.observe(loadMoreRef.current);
+        return () => observer.disconnect();
+    }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
     const { data: tasks } = useQuery({
         queryKey: ['tasks', 'all'],
@@ -158,7 +183,12 @@ export default function NotesPage() {
                                 </div>
                             );
                         })}
-                        {(!notes || notes.length === 0) && (
+                        {hasNextPage && (
+                            <div ref={loadMoreRef} style={{ display: 'flex', justifyContent: 'center', padding: '1rem' }}>
+                                <span className="spinner" />
+                            </div>
+                        )}
+                        {(!notes || notes.length === 0) && !isLoading && (
                             <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '2rem' }}>No notes yet</p>
                         )}
                     </div>
