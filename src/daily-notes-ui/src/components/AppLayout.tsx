@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
+import QuickCapture from './QuickCapture';
 
 const navItems = [
     { to: '/', label: 'Dashboard', icon: '📊' },
@@ -18,11 +20,23 @@ const navItems = [
 export default function AppLayout() {
     const { logout } = useAuthStore();
     const navigate = useNavigate();
+    const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false);
 
     const handleLogout = () => {
         logout();
         navigate('/login');
     };
+
+    useEffect(() => {
+        const handleGlobalKeyDown = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                e.preventDefault();
+                setIsQuickCaptureOpen(true);
+            }
+        };
+        window.addEventListener('keydown', handleGlobalKeyDown);
+        return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+    }, []);
 
     return (
         <div className="app-layout">
@@ -66,6 +80,20 @@ export default function AppLayout() {
                     ))}
                 </nav>
 
+                <div style={{ padding: '0 1rem 1rem 1rem' }}>
+                    <button
+                        onClick={() => setIsQuickCaptureOpen(true)}
+                        className="btn btn-primary"
+                        style={{ width: '100%', justifyContent: 'center', padding: '0.6rem', fontSize: '0.85rem', fontWeight: 600, display: 'flex', gap: '0.5rem', alignItems: 'center', boxShadow: '0 4px 12px rgba(var(--color-primary-rgb), 0.3)' }}
+                    >
+                        <span>⚡</span>
+                        <span>Quick Capture</span>
+                    </button>
+                    <div style={{ textAlign: 'center', marginTop: '0.4rem', fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>
+                        Cmd/Ctrl + K
+                    </div>
+                </div>
+
                 <div style={{
                     padding: '1rem 1.5rem',
                     borderTop: '1px solid var(--color-border)',
@@ -83,6 +111,8 @@ export default function AppLayout() {
             <main className="main-content">
                 <Outlet />
             </main>
+
+            <QuickCapture isOpen={isQuickCaptureOpen} onClose={() => setIsQuickCaptureOpen(false)} />
         </div>
     );
 }

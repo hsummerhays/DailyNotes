@@ -37,6 +37,7 @@ namespace DailyNotes.Api.Controllers
             return await query.OrderByDescending(t => t.CreatedAt).ToListAsync();
         }
 
+
         /// <summary>Retrieves all overdue work tasks (due date in the past and not completed).</summary>
         [HttpGet("overdue")]
         public async Task<ActionResult<IEnumerable<WorkTask>>> GetOverdue()

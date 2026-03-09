@@ -20,15 +20,19 @@ namespace DailyNotes.Api.Controllers
 
         /// <summary>Retrieves all topics, optionally filtered by a parent topic ID for hierarchy navigation.</summary>
         /// <param name="parentId">The ID of the parent topic. If null, root topics are returned.</param>
+        /// <param name="all">If true, returns all topics regardless of parent.</param>
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Topic>>> GetAll([FromQuery] int? parentId)
+        public async Task<ActionResult<IEnumerable<Topic>>> GetAll([FromQuery] int? parentId, [FromQuery] bool all = false)
         {
             var query = TenantScoped(_context.Topics).AsQueryable();
 
-            if (parentId.HasValue)
-                query = query.Where(t => t.ParentTopicId == parentId.Value);
-            else
-                query = query.Where(t => t.ParentTopicId == null); // Root topics
+            if (!all)
+            {
+                if (parentId.HasValue)
+                    query = query.Where(t => t.ParentTopicId == parentId.Value);
+                else
+                    query = query.Where(t => t.ParentTopicId == null); // Root topics
+            }
 
             return await query.OrderBy(t => t.Title).ToListAsync();
         }

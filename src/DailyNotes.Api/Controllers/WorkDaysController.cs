@@ -23,12 +23,16 @@ namespace DailyNotes.Api.Controllers
         /// <param name="from">The start date of a filter range.</param>
         /// <param name="to">The end date of a filter range.</param>
         /// <param name="all">If true, ignores date filters and returns all records.</param>
+        /// <param name="page">The page number for pagination (defaults to 1).</param>
+        /// <param name="pageSize">The number of records per page (defaults to 20).</param>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<WorkDay>>> GetAll(
             [FromQuery] DateOnly? date,
             [FromQuery] DateOnly? from,
             [FromQuery] DateOnly? to,
-            [FromQuery] bool all = false)
+            [FromQuery] bool all = false,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20)
         {
             var query = TenantScoped(_context.WorkDays).AsQueryable();
 
@@ -56,7 +60,11 @@ namespace DailyNotes.Api.Controllers
                 query = query.Where(w => w.WorkDate >= startDate && w.WorkDate <= endDate);
             }
 
-            return await query.OrderByDescending(w => w.WorkDate).ToListAsync();
+            return await query
+                .OrderByDescending(w => w.WorkDate)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
         }
 
         /// <summary>Retrieves the work day record representing the current date.</summary>

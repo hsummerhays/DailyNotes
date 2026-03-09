@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import api from '../lib/api';
 import { format, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear } from 'date-fns';
 import { formatDisplayDate } from '../lib/dateUtils';
@@ -31,35 +31,59 @@ export default function WorkDaysPage() {
     const [isNew, setIsNew] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState<WorkDay | null>(null);
 
-    const { data: workDays, isLoading } = useQuery({
+    const {
+        data: workDaysData,
+        isLoading,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage
+    } = useInfiniteQuery({
         queryKey: ['work-days', filterMode, format(selectedDate, 'yyyy-MM-dd')],
-        queryFn: async () => {
+        queryFn: async ({ pageParam = 1 }) => {
+            let url = `/work-days?page=${pageParam}&pageSize=20`;
             if (filterMode === 'day') {
-                return api.get(`/work-days?date=${format(selectedDate, 'yyyy-MM-dd')}`).then(r => r.data);
+                url += `&date=${format(selectedDate, 'yyyy-MM-dd')}`;
+            } else if (filterMode === 'all') {
+                url += `&all=true`;
+            } else {
+                let from, to;
+                if (filterMode === 'month') {
+                    from = startOfMonth(selectedDate);
+                    to = endOfMonth(selectedDate);
+                } else if (filterMode === 'last_month') {
+                    const lastMonth = subMonths(new Date(), 1);
+                    from = startOfMonth(lastMonth);
+                    to = endOfMonth(lastMonth);
+                } else if (filterMode === 'year') {
+                    from = startOfYear(selectedDate);
+                    to = endOfYear(selectedDate);
+                }
+                if (from && to) {
+                    url += `&from=${format(from, 'yyyy-MM-dd')}&to=${format(to, 'yyyy-MM-dd')}`;
+                }
             }
-            if (filterMode === 'all') {
-                return api.get(`/work-days?all=true`).then(r => r.data);
-            }
-
-            let from, to;
-            if (filterMode === 'month') {
-                from = startOfMonth(selectedDate);
-                to = endOfMonth(selectedDate);
-            } else if (filterMode === 'last_month') {
-                const lastMonth = subMonths(new Date(), 1);
-                from = startOfMonth(lastMonth);
-                to = endOfMonth(lastMonth);
-            } else if (filterMode === 'year') {
-                from = startOfYear(selectedDate);
-                to = endOfYear(selectedDate);
-            }
-
-            if (from && to) {
-                return api.get(`/work-days?from=${format(from, 'yyyy-MM-dd')}&to=${format(to, 'yyyy-MM-dd')}`).then(r => r.data);
-            }
-            return [];
+            return api.get(url).then(r => r.data);
         },
+        getNextPageParam: (lastPage, allPages) => lastPage.length === 20 ? allPages.length + 1 : undefined,
+        initialPageParam: 1,
     });
+
+    const workDays = useMemo(() => workDaysData?.pages.flat() || [], [workDaysData]);
+
+    const loadMoreRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+                    fetchNextPage();
+                }
+            },
+            { threshold: 1.0 }
+        );
+        if (loadMoreRef.current) observer.observe(loadMoreRef.current);
+        return () => observer.disconnect();
+    }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
     const { data: todayData } = useQuery({
         queryKey: ['work-day-today'],
@@ -200,7 +224,12 @@ export default function WorkDaysPage() {
                                 )}
                             </div>
                         ))}
-                        {(!workDays || workDays.length === 0) && (
+                        {hasNextPage && (
+                            <div ref={loadMoreRef} style={{ display: 'flex', justifyContent: 'center', padding: '1rem' }}>
+                                <span className="spinner" />
+                            </div>
+                        )}
+                        {(!workDays || workDays.length === 0) && !isLoading && (
                             <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '2rem' }}>
                                 No work days found for this filter.
                             </p>

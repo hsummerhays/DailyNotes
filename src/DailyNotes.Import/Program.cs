@@ -365,7 +365,8 @@ if (File.Exists(notesFile))
                 taskId = mappedId;
         }
 
-        string? noteContent = dict.ContainsKey("Note") ? dict["Note"]?.ToString() :
+        string? noteContent = dict.ContainsKey("Notes") ? dict["Notes"]?.ToString() :
+                              dict.ContainsKey("Note") ? dict["Note"]?.ToString() :
                               dict.ContainsKey("Content") ? dict["Content"]?.ToString() : null;
 
         var noteDateVal = ParseDate(dict.ContainsKey("Date") ? dict["Date"]?.ToString() :

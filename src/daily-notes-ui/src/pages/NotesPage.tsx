@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import api from '../lib/api';
 import { formatDisplayDate } from '../lib/dateUtils';
@@ -21,22 +22,20 @@ const EMPTY: Note = { noteDate: today(), content: {}, workTaskId: null, timeMinu
 
 const extractText = (content: unknown): string => {
     if (!content) return '';
-    if (typeof content === 'string') return content;
-    const c = content as Record<string, unknown>;
-    if (typeof c.text === 'string') return c.text;
-    if (c.type === 'doc' && Array.isArray(c.content)) {
-        return (c.content as unknown[]).map((node: unknown) => {
-            const n = node as Record<string, unknown>;
-            if (Array.isArray(n.content)) {
-                return (n.content as unknown[]).map((t: unknown) => {
-                    const tx = t as Record<string, unknown>;
-                    return typeof tx.text === 'string' ? tx.text : '';
-                }).join('');
+    try {
+        const getNodesText = (node: any): string => {
+            let text = '';
+            if (node?.text) text += node.text;
+            if (node?.children && Array.isArray(node.children)) {
+                text += node.children.map(getNodesText).join(' ');
             }
-            return '';
-        }).join('\n');
+            return text;
+        };
+        const root = (content as any).root || content;
+        return getNodesText(root).trim();
+    } catch (e) {
+        return typeof content === 'string' ? content : 'Complex content...';
     }
-    return '';
 };
 
 export default function NotesPage() {
@@ -46,6 +45,11 @@ export default function NotesPage() {
     const [isNew, setIsNew] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState<Note | null>(null);
 
+    const [searchParams] = useSearchParams();
+    const taskIdFilter = searchParams.get('taskId');
+    const noteIdFocus = searchParams.get('noteId');
+    const hasAutoOpened = useRef(false);
+
     const {
         data: notesData,
         isLoading,
@@ -53,13 +57,26 @@ export default function NotesPage() {
         hasNextPage,
         isFetchingNextPage
     } = useInfiniteQuery({
-        queryKey: ['notes'],
-        queryFn: ({ pageParam = 1 }) => api.get(`/work-notes?page=${pageParam}&pageSize=20`).then(r => r.data),
+        queryKey: ['notes', taskIdFilter],
+        queryFn: ({ pageParam = 1 }) => {
+            const taskQuery = taskIdFilter ? `&taskId=${taskIdFilter}` : '';
+            return api.get(`/work-notes?page=${pageParam}&pageSize=20${taskQuery}`).then(r => r.data);
+        },
         getNextPageParam: (lastPage, allPages) => lastPage.length === 20 ? allPages.length + 1 : undefined,
         initialPageParam: 1,
     });
 
     const notes = useMemo(() => notesData?.pages.flat() || [], [notesData]);
+
+    useEffect(() => {
+        if (noteIdFocus && !hasAutoOpened.current) {
+            hasAutoOpened.current = true;
+            api.get(`/work-notes/${noteIdFocus}`).then(r => {
+                setEditing(r.data);
+                setIsNew(false);
+            }).catch(() => { });
+        }
+    }, [noteIdFocus]);
 
     const loadMoreRef = useRef<HTMLDivElement>(null);
 

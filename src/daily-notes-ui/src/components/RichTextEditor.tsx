@@ -342,38 +342,39 @@ function LocalCodeHighlightPlugin() {
 
 function LegacyDataHandler({ value }: { value: any }) {
     const [editor] = useLexicalComposerContext();
-    const [lastExternalValue, setLastExternalValue] = useState<any>(null);
 
     useEffect(() => {
-        if (value === lastExternalValue) return;
-        setLastExternalValue(value);
-
         if (!value) return;
+
+        const currentEditorStateJson = JSON.stringify(editor.getEditorState().toJSON());
+        const newJson = JSON.stringify(value);
+
+        // Prevent update loop if the state already matches what's in the editor
+        if (currentEditorStateJson === newJson) return;
 
         editor.update(() => {
             if (typeof value === 'object' && value.root) {
                 try {
-                    const state = editor.parseEditorState(JSON.stringify(value));
+                    const state = editor.parseEditorState(newJson);
                     editor.setEditorState(state);
                 } catch (e) {
                     console.error('Failed to parse Lexical state', e);
                 }
-                return;
-            }
-
-            const root = $getRoot();
-            root.clear();
-            const p = $createParagraphNode();
-            let text = '';
-            if (typeof value === 'object') {
-                text = typeof value.text === 'string' ? value.text : JSON.stringify(value);
             } else {
-                text = String(value);
+                const root = $getRoot();
+                root.clear();
+                const p = $createParagraphNode();
+                let text = '';
+                if (typeof value === 'object') {
+                    text = typeof value.text === 'string' ? value.text : JSON.stringify(value);
+                } else {
+                    text = String(value);
+                }
+                p.append($createTextNode(text));
+                root.append(p);
             }
-            p.append($createTextNode(text));
-            root.append(p);
         });
-    }, [editor, value, lastExternalValue]);
+    }, [editor, value]);
 
     return null;
 }

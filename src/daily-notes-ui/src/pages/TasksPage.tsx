@@ -4,6 +4,8 @@ import api from '../lib/api';
 import { formatDisplayDate } from '../lib/dateUtils';
 import Modal from '../components/Modal';
 import { useToast, ToastContainer } from '../components/Toast';
+import { Link } from 'react-router-dom';
+import { ExternalLink } from 'lucide-react';
 
 import { TASK_STATUS, TASK_STATUS_OPTIONS, type TaskStatusFilter } from '../lib/taskStatus';
 
@@ -107,6 +109,31 @@ export default function TasksPage() {
     const projectName = (id?: number | null) =>
         id ? projects?.find((p: any) => p.id === id)?.name ?? `#${id}` : null;
 
+    // Fetch notes for the task being edited
+    const { data: taskNotes, isLoading: isNotesLoading } = useQuery({
+        queryKey: ['task-notes', editing?.id],
+        queryFn: () => api.get(`/work-notes?taskId=${editing?.id}&pageSize=5`).then((r) => r.data),
+        enabled: !!editing?.id,
+    });
+
+    const extractText = (content: unknown): string => {
+        if (!content) return '';
+        try {
+            const getNodesText = (node: any): string => {
+                let text = '';
+                if (node?.text) text += node.text;
+                if (node?.children && Array.isArray(node.children)) {
+                    text += node.children.map(getNodesText).join(' ');
+                }
+                return text;
+            };
+            const root = (content as any).root || content;
+            return getNodesText(root).trim();
+        } catch (e) {
+            return typeof content === 'string' ? content : 'Complex content...';
+        }
+    };
+
     return (
         <>
             <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -184,56 +211,91 @@ export default function TasksPage() {
             </div>
 
             {editing && (
-                <Modal title={isNew ? 'New Task' : 'Edit Task'} onClose={() => setEditing(null)}>
-                    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                        <div>
-                            <label style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '0.375rem' }}>
-                                Name *
+                <Modal title={isNew ? 'New Task' : 'Edit Task'} onClose={() => setEditing(null)} width={isNew ? 500 : 800}>
+                    <div style={{ display: 'grid', gridTemplateColumns: isNew ? '1fr' : '1fr 300px', gap: '2rem' }}>
+                        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            <div>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '0.375rem' }}>
+                                    Name *
+                                </label>
+                                <input className="input" name="name" defaultValue={editing.name} required autoFocus />
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                <div>
+                                    <label style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '0.375rem' }}>Status</label>
+                                    <select className="input" name="status" defaultValue={editing.status}>
+                                        <option value={TASK_STATUS.pending}>Pending</option>
+                                        <option value={TASK_STATUS.inProgress}>In Progress</option>
+                                        <option value={TASK_STATUS.completed}>Completed</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '0.375rem' }}>Project *</label>
+                                    <select className="input" name="projectId" defaultValue={editing.projectId ?? ''} required>
+                                        <option value="" disabled>Select a project…</option>
+                                        {projects?.map((p: any) => (
+                                            <option key={p.id} value={p.id}>{p.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '0.375rem' }}>Start Date</label>
+                                    <input className="input" name="startDate" type="date" defaultValue={editing.startDate?.split('T')[0] ?? ''} />
+                                </div>
+                                <div>
+                                    <label style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '0.375rem' }}>Due Date</label>
+                                    <input className="input" name="dueDate" type="date" defaultValue={editing.dueDate?.split('T')[0] ?? ''} />
+                                </div>
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '0.375rem' }}>Comments</label>
+                                <textarea className="input" name="comments" rows={3} defaultValue={editing.comments ?? ''} style={{ resize: 'vertical' }} />
+                            </div>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer' }}>
+                                <input type="checkbox" name="isPinned" defaultChecked={editing.isPinned} />
+                                Pin this task
                             </label>
-                            <input className="input" name="name" defaultValue={editing.name} required autoFocus />
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                            <div>
-                                <label style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '0.375rem' }}>Status</label>
-                                <select className="input" name="status" defaultValue={editing.status}>
-                                    <option value={TASK_STATUS.pending}>Pending</option>
-                                    <option value={TASK_STATUS.inProgress}>In Progress</option>
-                                    <option value={TASK_STATUS.completed}>Completed</option>
-                                </select>
+                            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                                <button type="button" className="btn btn-secondary" onClick={() => setEditing(null)}>Cancel</button>
+                                <button type="submit" className="btn btn-primary" disabled={save.isPending}>
+                                    {save.isPending ? 'Saving...' : 'Save'}
+                                </button>
                             </div>
-                            <div>
-                                <label style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '0.375rem' }}>Project *</label>
-                                <select className="input" name="projectId" defaultValue={editing.projectId ?? ''} required>
-                                    <option value="" disabled>Select a project…</option>
-                                    {projects?.map((p: any) => (
-                                        <option key={p.id} value={p.id}>{p.name}</option>
-                                    ))}
-                                </select>
+                        </form>
+
+                        {!isNew && (
+                            <div style={{ borderLeft: '1px solid var(--color-border)', paddingLeft: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                <h3 style={{ fontSize: '0.875rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    Recent Activity
+                                </h3>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '400px', overflowY: 'auto', paddingRight: '0.5rem' }}>
+                                    {isNotesLoading ? (
+                                        <div style={{ textAlign: 'center', padding: '1rem' }}><span className="spinner" /></div>
+                                    ) : taskNotes?.length > 0 ? (
+                                        taskNotes.map((n: any) => (
+                                            <div key={n.id} style={{ padding: '0.75rem', background: 'rgba(0,0,0,0.1)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', position: 'relative' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                                                    <div style={{ fontSize: '0.7rem', color: 'var(--color-primary-light)', fontWeight: 600 }}>
+                                                        {formatDisplayDate(n.noteDate, 'MMM d, yyyy')}
+                                                    </div>
+                                                    <Link to={`/notes?taskId=${editing.id}&noteId=${n.id}`} style={{ color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center' }} title="View in Notes">
+                                                        <ExternalLink size={12} />
+                                                    </Link>
+                                                </div>
+                                                <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.4' }}>
+                                                    {extractText(n.content)}
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', textAlign: 'center', marginTop: '1rem' }}>
+                                            No notes yet for this task.
+                                        </p>
+                                    )}
+                                </div>
                             </div>
-                            <div>
-                                <label style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '0.375rem' }}>Start Date</label>
-                                <input className="input" name="startDate" type="date" defaultValue={editing.startDate?.split('T')[0] ?? ''} />
-                            </div>
-                            <div>
-                                <label style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '0.375rem' }}>Due Date</label>
-                                <input className="input" name="dueDate" type="date" defaultValue={editing.dueDate?.split('T')[0] ?? ''} />
-                            </div>
-                        </div>
-                        <div>
-                            <label style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '0.375rem' }}>Comments</label>
-                            <textarea className="input" name="comments" rows={3} defaultValue={editing.comments ?? ''} style={{ resize: 'vertical' }} />
-                        </div>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer' }}>
-                            <input type="checkbox" name="isPinned" defaultChecked={editing.isPinned} />
-                            Pin this task
-                        </label>
-                        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-                            <button type="button" className="btn btn-secondary" onClick={() => setEditing(null)}>Cancel</button>
-                            <button type="submit" className="btn btn-primary" disabled={save.isPending}>
-                                {save.isPending ? 'Saving...' : 'Save'}
-                            </button>
-                        </div>
-                    </form>
+                        )}
+                    </div>
                 </Modal>
             )}
 

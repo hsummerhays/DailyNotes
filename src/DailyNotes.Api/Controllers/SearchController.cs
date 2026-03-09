@@ -22,12 +22,16 @@ namespace DailyNotes.Api.Controllers
         /// <param name="type">The type of items to search for ('all', 'notes', 'tasks', or 'topics').</param>
         /// <param name="dateFrom">Optional start date filter for the search.</param>
         /// <param name="dateTo">Optional end date filter for the search.</param>
+        /// <param name="projectId">Optional project ID filter.</param>
+        /// <param name="statuses">Optional comma-separated status filter (e.g. 'pending,in_progress').</param>
         [HttpGet]
         public async Task<ActionResult<object>> Search(
             [FromQuery] string q,
             [FromQuery] string type = "all",
             [FromQuery] DateTime? dateFrom = null,
-            [FromQuery] DateTime? dateTo = null)
+            [FromQuery] DateTime? dateTo = null,
+            [FromQuery] int? projectId = null,
+            [FromQuery] string? statuses = null) // Comma-separated
         {
             if (string.IsNullOrWhiteSpace(q))
                 return BadRequest(new { message = "Search query 'q' is required." });
@@ -56,6 +60,17 @@ namespace DailyNotes.Api.Controllers
                     notesQuery = notesQuery.Where(n => n.NoteDate <= dTo);
                 }
 
+                if (projectId.HasValue)
+                {
+                    notesQuery = notesQuery.Where(n => n.WorkTaskId != null && _context.WorkTasks.Any(t => t.Id == n.WorkTaskId && t.ProjectId == projectId.Value));
+                }
+
+                if (!string.IsNullOrEmpty(statuses))
+                {
+                    var sList = statuses.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                    notesQuery = notesQuery.Where(n => n.WorkTaskId != null && _context.WorkTasks.Any(t => t.Id == n.WorkTaskId && sList.Contains(t.Status)));
+                }
+
                 // If q is provided, we can't easily search JSON content in basic SQL efficiently without specific setup
                 // We'll load recent notes and filter in memory for this simple implementation
                 // OR we rely on a specific column if available.
@@ -81,6 +96,15 @@ namespace DailyNotes.Api.Controllers
             {
                 var tasksQuery = TenantScoped(_context.WorkTasks)
                     .Where(t => t.Name.ToLower().Contains(searchTerm));
+
+                if (projectId.HasValue)
+                    tasksQuery = tasksQuery.Where(t => t.ProjectId == projectId.Value);
+
+                if (!string.IsNullOrEmpty(statuses))
+                {
+                    var sList = statuses.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                    tasksQuery = tasksQuery.Where(t => sList.Contains(t.Status));
+                }
 
                 if (dateFrom.HasValue)
                     tasksQuery = tasksQuery.Where(t => t.CreatedAt >= dateFrom.Value);
