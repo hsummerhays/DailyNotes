@@ -44,7 +44,7 @@ Console.WriteLine();
 
 // ── Build DbContext ──────────────────────────────────────────────
 var connString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
-    ?? "Host=localhost;Port=5432;Database=dailynotes;Username=postgres;Password=postgres";
+    ?? "Host=localhost;Port=5432;Database=DailyNotes;Username=postgres;Password=";
 
 var services = new ServiceCollection();
 services.AddDbContext<DailyNotesDbContext>(options =>
@@ -228,7 +228,8 @@ if (File.Exists(tasksFile))
                 Console.WriteLine($"  [!] Project ID '{fmProjectId}' not found for task '{dict["Name"]?.ToString()}'");
         }
 
-        var startDateVal = ParseDate(dict.ContainsKey("StartDate") ? dict["StartDate"]?.ToString() : null, "StartDate");
+        var startDateVal = ParseDate(dict.ContainsKey("StartDate") ? dict["StartDate"]?.ToString() :
+                                    dict.ContainsKey("Start Date") ? dict["Start Date"]?.ToString() : null, "StartDate");
         var dueDateVal = ParseDate(dict.ContainsKey("DueDate") ? dict["DueDate"]?.ToString() :
                                 dict.ContainsKey("Due Date") ? dict["Due Date"]?.ToString() : null, "DueDate");
 
@@ -435,9 +436,11 @@ if (File.Exists(payPeriodsFile))
         var dict = (IDictionary<string, object>)row;
         string? startStr = dict.ContainsKey("Period Start Date") ? dict["Period Start Date"]?.ToString() :
                            dict.ContainsKey("StartDate") ? dict["StartDate"]?.ToString() :
+                           dict.ContainsKey("Period Start") ? dict["Period Start"]?.ToString() :
                            dict.ContainsKey("PeriodStartDate") ? dict["PeriodStartDate"]?.ToString() : null;
         string? endStr = dict.ContainsKey("Period End Date") ? dict["Period End Date"]?.ToString() :
                          dict.ContainsKey("EndDate") ? dict["EndDate"]?.ToString() :
+                         dict.ContainsKey("Period End") ? dict["Period End"]?.ToString() :
                          dict.ContainsKey("PeriodEndDate") ? dict["PeriodEndDate"]?.ToString() : null;
 
         var startDate = ParseDate(startStr, "PeriodStartDate");

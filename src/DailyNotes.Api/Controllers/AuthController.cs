@@ -16,6 +16,8 @@ namespace DailyNotes.Api.Controllers
             _authService = authService;
         }
 
+        /// <summary>Registers a new user account.</summary>
+        /// <param name="model">The registration data (email and password).</param>
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterDto model)
         {
@@ -30,6 +32,8 @@ namespace DailyNotes.Api.Controllers
             }
         }
 
+        /// <summary>Authenticates a user and returns a JWT token.</summary>
+        /// <param name="model">The login credentials (email and password).</param>
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto model)
         {
@@ -44,6 +48,8 @@ namespace DailyNotes.Api.Controllers
             }
         }
 
+        /// <summary>Refreshes an expired JWT token using a valid refresh token.</summary>
+        /// <param name="model">The refresh token request.</param>
         [HttpPost("refresh")]
         public async Task<IActionResult> Refresh([FromBody] RefreshTokenRequest model)
         {

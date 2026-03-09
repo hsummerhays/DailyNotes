@@ -18,7 +18,8 @@ namespace DailyNotes.Api.Controllers
             _context = context;
         }
 
-        /// <summary>GET /api/courses?semester=Spring 2026</summary>
+        /// <summary>Retrieves all courses, optionally filtered by semester.</summary>
+        /// <param name="semester">Filter courses by a specific semester (e.g., 'Spring 2026').</param>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Course>>> GetAll([FromQuery] string? semester)
         {
@@ -30,6 +31,8 @@ namespace DailyNotes.Api.Controllers
             return await query.OrderByDescending(c => c.CreatedAt).ToListAsync();
         }
 
+        /// <summary>Retrieves a specific course by its ID, including its associated assignments.</summary>
+        /// <param name="id">The unique ID of the course.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<Course>> GetById(int id)
         {
@@ -43,6 +46,8 @@ namespace DailyNotes.Api.Controllers
             return course;
         }
 
+        /// <summary>Creates a new course.</summary>
+        /// <param name="course">The course data to be created.</param>
         [HttpPost]
         public async Task<ActionResult<Course>> Create(Course course)
         {
@@ -57,6 +62,9 @@ namespace DailyNotes.Api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = course.Id }, course);
         }
 
+        /// <summary>Updates an existing course record.</summary>
+        /// <param name="id">The ID of the course to update.</param>
+        /// <param name="course">The updated course data.</param>
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, Course course)
         {
@@ -86,6 +94,8 @@ namespace DailyNotes.Api.Controllers
             return NoContent();
         }
 
+        /// <summary>Deletes a course record.</summary>
+        /// <param name="id">The ID of the course to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {

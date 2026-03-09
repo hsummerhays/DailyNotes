@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 import { format, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear } from 'date-fns';
+import { formatDisplayDate } from '../lib/dateUtils';
 import Modal from '../components/Modal';
 import { useToast, ToastContainer } from '../components/Toast';
 
@@ -176,7 +177,7 @@ export default function WorkDaysPage() {
                             <div key={wd.id} className="card" style={{ padding: '1rem' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <div>
-                                        <span style={{ fontWeight: 500 }}>{format(new Date(wd.workDate), 'EEEE, MMM d, yyyy')}</span>
+                                        <span style={{ fontWeight: 500 }}>{formatDisplayDate(wd.workDate, 'EEEE, MMM d, yyyy')}</span>
                                         <span style={{ marginLeft: '1rem', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
                                             {wd.timeIn1}{wd.timeOut1 && ` → ${wd.timeOut1}`}
                                         </span>
@@ -256,7 +257,7 @@ export default function WorkDaysPage() {
             {confirmDelete && (
                 <Modal title="Delete Work Day" onClose={() => setConfirmDelete(null)} width={380}>
                     <p style={{ marginBottom: '1.5rem' }}>
-                        Delete work day <strong>{format(new Date((confirmDelete as any).workDate), 'MMM d, yyyy')}</strong>? This cannot be undone.
+                        Delete work day <strong>{formatDisplayDate((confirmDelete as any).workDate)}</strong>? This cannot be undone.
                     </p>
                     <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
                         <button className="btn btn-secondary" onClick={() => setConfirmDelete(null)}>Cancel</button>

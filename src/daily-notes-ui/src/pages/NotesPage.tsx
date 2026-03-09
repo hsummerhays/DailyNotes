@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import api from '../lib/api';
-import { format } from 'date-fns';
+import { formatDisplayDate } from '../lib/dateUtils';
 import Modal from '../components/Modal';
 import { useToast, ToastContainer } from '../components/Toast';
+import RichTextEditor from '../components/RichTextEditor';
 
 interface Note {
     id?: number;
@@ -119,7 +120,6 @@ export default function NotesPage() {
         save.mutate({
             ...editing,
             noteDate: fd.get('noteDate') as string,
-            content: { text: fd.get('text') as string },
             workTaskId: Number(taskId),
             timeMinutes: Number(fd.get('timeMinutes')) || 0,
             isPinned: fd.get('isPinned') === 'on',
@@ -155,7 +155,7 @@ export default function NotesPage() {
                                         <div style={{ flex: 1 }}>
                                             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginBottom: '0.5rem' }}>
                                                 <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>
-                                                    {format(new Date(note.noteDate), 'MMM d, yyyy')}
+                                                    {formatDisplayDate(note.noteDate)}
                                                 </span>
                                                 {note.workTaskId && (
                                                     <span style={{ fontSize: '0.75rem', color: 'var(--color-accent)' }}>
@@ -228,11 +228,11 @@ export default function NotesPage() {
                         </div>
                         <div>
                             <label style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '0.375rem' }}>Content</label>
-                            <textarea className="input" name="text" rows={8}
-                                defaultValue={extractText(editing.content)}
-                                placeholder="Write your note here..."
-                                autoFocus
-                                style={{ resize: 'vertical', fontFamily: 'inherit' }} />
+                            <RichTextEditor
+                                value={editing.content}
+                                onChange={(val) => setEditing({ ...editing, content: val })}
+                                placeholder="Start typing your work note..."
+                            />
                         </div>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer' }}>
                             <input type="checkbox" name="isPinned" defaultChecked={editing.isPinned} />
@@ -251,7 +251,7 @@ export default function NotesPage() {
             {confirmDelete && (
                 <Modal title="Delete Note" onClose={() => setConfirmDelete(null)} width={380}>
                     <p style={{ marginBottom: '1.5rem' }}>
-                        Delete note from <strong>{format(new Date((confirmDelete as any).noteDate), 'MMM d, yyyy')}</strong>? This cannot be undone.
+                        Delete note from <strong>{formatDisplayDate((confirmDelete as any).noteDate)}</strong>? This cannot be undone.
                     </p>
                     <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
                         <button className="btn btn-secondary" onClick={() => setConfirmDelete(null)}>Cancel</button>

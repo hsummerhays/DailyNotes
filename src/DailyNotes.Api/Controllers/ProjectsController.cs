@@ -18,7 +18,7 @@ namespace DailyNotes.Api.Controllers
             _context = context;
         }
 
-        /// <summary>GET /api/projects</summary>
+        /// <summary>Retrieves all projects belonging to the current tenant.</summary>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Project>>> GetAll()
         {
@@ -27,7 +27,8 @@ namespace DailyNotes.Api.Controllers
                 .ToListAsync();
         }
 
-        /// <summary>GET /api/projects/{id}</summary>
+        /// <summary>Retrieves a specific project by its ID.</summary>
+        /// <param name="id">The unique ID of the project.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<Project>> GetById(int id)
         {
@@ -39,7 +40,8 @@ namespace DailyNotes.Api.Controllers
             return project;
         }
 
-        /// <summary>GET /api/projects/{id}/tasks — all tasks for a project</summary>
+        /// <summary>Retrieves all work tasks associated with a specific project.</summary>
+        /// <param name="id">The ID of the project.</param>
         [HttpGet("{id}/tasks")]
         public async Task<ActionResult<IEnumerable<WorkTask>>> GetProjectTasks(int id)
         {
@@ -56,7 +58,8 @@ namespace DailyNotes.Api.Controllers
             return tasks;
         }
 
-        /// <summary>POST /api/projects</summary>
+        /// <summary>Creates a new project.</summary>
+        /// <param name="project">The project data to be created.</param>
         [HttpPost]
         public async Task<ActionResult<Project>> Create(Project project)
         {
@@ -71,7 +74,9 @@ namespace DailyNotes.Api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = project.Id }, project);
         }
 
-        /// <summary>PUT /api/projects/{id}</summary>
+        /// <summary>Updates an existing project record.</summary>
+        /// <param name="id">The ID of the project to update.</param>
+        /// <param name="project">The updated project data.</param>
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, Project project)
         {
@@ -95,6 +100,8 @@ namespace DailyNotes.Api.Controllers
             return NoContent();
         }
 
+        /// <summary>Deletes a project and its associated metadata (tasks remain but are unlinked if handled by DB).</summary>
+        /// <param name="id">The ID of the project to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {

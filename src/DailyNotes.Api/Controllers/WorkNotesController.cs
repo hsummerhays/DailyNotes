@@ -18,7 +18,11 @@ namespace DailyNotes.Api.Controllers
             _context = context;
         }
 
-        /// <summary>GET /api/work-notes?date=2025-01-15&taskId=1&page=1&pageSize=20</summary>
+        /// <summary>Retrieves all work notes, optionally filtered by date or task ID, with pagination.</summary>
+        /// <param name="date">Filter notes by a specific date.</param>
+        /// <param name="taskId">Filter notes belonging to a specific task.</param>
+        /// <param name="page">The page number for pagination (defaults to 1).</param>
+        /// <param name="pageSize">The number of notes per page (defaults to 20).</param>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<WorkNote>>> GetAll(
             [FromQuery] DateOnly? date,
@@ -42,7 +46,8 @@ namespace DailyNotes.Api.Controllers
                 .ToListAsync();
         }
 
-        /// <summary>GET /api/work-notes/{id}</summary>
+        /// <summary>Retrieves a specific work note by its unique ID.</summary>
+        /// <param name="id">The unique ID of the note.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<WorkNote>> GetById(int id)
         {
@@ -54,7 +59,8 @@ namespace DailyNotes.Api.Controllers
             return note;
         }
 
-        /// <summary>POST /api/work-notes</summary>
+        /// <summary>Creates a new work note. Also ensures the corresponding work day record exists.</summary>
+        /// <param name="workNote">The work note data to be created.</param>
         [HttpPost]
         public async Task<ActionResult<WorkNote>> Create(WorkNote workNote)
         {
@@ -91,7 +97,9 @@ namespace DailyNotes.Api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = workNote.Id }, workNote);
         }
 
-        /// <summary>PUT /api/work-notes/{id}</summary>
+        /// <summary>Updates an existing work note.</summary>
+        /// <param name="id">The ID of the note to update.</param>
+        /// <param name="workNote">The updated work note data.</param>
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, WorkNote workNote)
         {
@@ -118,6 +126,8 @@ namespace DailyNotes.Api.Controllers
             return NoContent();
         }
 
+        /// <summary>Deletes a work note.</summary>
+        /// <param name="id">The ID of the note to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {

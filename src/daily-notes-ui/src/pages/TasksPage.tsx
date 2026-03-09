@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
-import { format } from 'date-fns';
+import { formatDisplayDate } from '../lib/dateUtils';
 import Modal from '../components/Modal';
 import { useToast, ToastContainer } from '../components/Toast';
 
@@ -23,18 +23,39 @@ const EMPTY: Task = { name: '', status: 'pending', comments: '', dueDate: '', st
 export default function TasksPage() {
     const qc = useQueryClient();
     const { toasts, toast, dismiss } = useToast();
-    const [status, setStatus] = useState<TaskStatusFilter>('all');
+    const [status, setStatus] = useState<TaskStatusFilter>(TASK_STATUS.pending);
+    const hasAutoSwitched = useRef(false);
     const [editing, setEditing] = useState<Task | null>(null);
     const [isNew, setIsNew] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState<Task | null>(null);
 
-    const { data: tasks, isLoading } = useQuery({
-        queryKey: ['tasks', status],
-        queryFn: () => {
-            const params = status !== 'all' ? `?status=${status}` : '';
-            return api.get(`/work-tasks${params}`).then((r) => r.data);
-        },
+    const { data: allTasks, isLoading } = useQuery({
+        queryKey: ['tasks'],
+        queryFn: () => api.get('/work-tasks').then((r) => r.data),
     });
+
+    const counts = useMemo(() => {
+        const c: Record<string, number> = { all: allTasks?.length ?? 0 };
+        allTasks?.forEach((t: any) => {
+            c[t.status] = (c[t.status] || 0) + 1;
+        });
+        return c;
+    }, [allTasks]);
+
+    const tasks = useMemo(() => {
+        if (status === 'all') return allTasks;
+        return allTasks?.filter((t: any) => t.status === status);
+    }, [allTasks, status]);
+
+    useEffect(() => {
+        if (!isLoading && allTasks && !hasAutoSwitched.current) {
+            const pendingCount = allTasks.filter((t: any) => t.status === TASK_STATUS.pending).length;
+            if (pendingCount === 0) {
+                setStatus('all');
+            }
+            hasAutoSwitched.current = true;
+        }
+    }, [allTasks, isLoading]);
 
     const { data: projects } = useQuery({
         queryKey: ['projects'],
@@ -97,8 +118,17 @@ export default function TasksPage() {
                     {TASK_STATUS_OPTIONS.map((s) => (
                         <button key={s} className={`btn ${status === s ? 'btn-primary' : 'btn-secondary'}`}
                             onClick={() => setStatus(s)}
-                            style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
-                            {s === 'all' ? 'All' : s.replace('_', ' ')}
+                            style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span>{s === 'all' ? 'all' : s.replace('_', ' ')}</span>
+                            <span style={{
+                                backgroundColor: status === s ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.05)',
+                                padding: '0.1rem 0.4rem',
+                                borderRadius: '4px',
+                                fontSize: '0.7rem',
+                                fontWeight: 600
+                            }}>
+                                {counts[s] ?? 0}
+                            </span>
                         </button>
                     ))}
                     <button className="btn btn-primary" onClick={() => { setIsNew(true); setEditing({ ...EMPTY }); }}>
@@ -131,12 +161,11 @@ export default function TasksPage() {
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                         {task.dueDate && (
                                             <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-                                                Due {format(new Date(task.dueDate), 'MMM d')}
+                                                Due {formatDisplayDate(task.dueDate, 'MMM d')}
                                             </span>
                                         )}
                                         <span className={`badge ${task.status === TASK_STATUS.completed ? 'badge-success' :
-                                            task.status === TASK_STATUS.inProgress ? 'badge-primary' :
-                                                task.status === TASK_STATUS.onHold ? 'badge-warning' : 'badge-warning'}`}>
+                                            task.status === TASK_STATUS.inProgress ? 'badge-primary' : 'badge-warning'}`}>
                                             {task.status.replace('_', ' ')}
                                         </span>
                                         <button className="btn btn-secondary" style={{ padding: '0.3rem 0.7rem', fontSize: '0.75rem' }}
@@ -170,7 +199,6 @@ export default function TasksPage() {
                                     <option value={TASK_STATUS.pending}>Pending</option>
                                     <option value={TASK_STATUS.inProgress}>In Progress</option>
                                     <option value={TASK_STATUS.completed}>Completed</option>
-                                    <option value={TASK_STATUS.onHold}>On Hold</option>
                                 </select>
                             </div>
                             <div>

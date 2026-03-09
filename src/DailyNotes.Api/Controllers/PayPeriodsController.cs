@@ -18,7 +18,8 @@ namespace DailyNotes.Api.Controllers
             _context = context;
         }
 
-        /// <summary>GET /api/pay-periods?date=2025-01-15</summary>
+        /// <summary>Retrieves all pay periods, optionally filtered by a specific date.</summary>
+        /// <param name="date">Filter to find the pay period that includes this date.</param>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<PayPeriod>>> GetAll([FromQuery] DateOnly? date)
         {
@@ -30,7 +31,8 @@ namespace DailyNotes.Api.Controllers
             return await query.OrderByDescending(p => p.PeriodEndDate).ToListAsync();
         }
 
-        /// <summary>GET /api/pay-periods/{id}</summary>
+        /// <summary>Retrieves a specific pay period by its ID.</summary>
+        /// <param name="id">The unique ID of the pay period.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<PayPeriod>> GetById(int id)
         {
@@ -42,7 +44,8 @@ namespace DailyNotes.Api.Controllers
             return period;
         }
 
-        /// <summary>GET /api/pay-periods/{id}/work-days — all work days in a pay period</summary>
+        /// <summary>Retrieves all work day records that fall within a specific pay period's date range.</summary>
+        /// <param name="id">The ID of the pay period.</param>
         [HttpGet("{id}/work-days")]
         public async Task<ActionResult<IEnumerable<WorkDay>>> GetPayPeriodWorkDays(int id)
         {
@@ -60,7 +63,8 @@ namespace DailyNotes.Api.Controllers
             return workDays;
         }
 
-        /// <summary>POST /api/pay-periods</summary>
+        /// <summary>Creates a new pay period record.</summary>
+        /// <param name="payPeriod">The pay period data to be created.</param>
         [HttpPost]
         public async Task<ActionResult<PayPeriod>> Create(PayPeriod payPeriod)
         {
@@ -74,7 +78,9 @@ namespace DailyNotes.Api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = payPeriod.Id }, payPeriod);
         }
 
-        /// <summary>PUT /api/pay-periods/{id}</summary>
+        /// <summary>Updates an existing pay period record.</summary>
+        /// <param name="id">The ID of the pay period to update.</param>
+        /// <param name="payPeriod">The updated pay period data.</param>
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, PayPeriod payPeriod)
         {
@@ -97,6 +103,8 @@ namespace DailyNotes.Api.Controllers
             return NoContent();
         }
 
+        /// <summary>Deletes a pay period record.</summary>
+        /// <param name="id">The ID of the pay period to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {

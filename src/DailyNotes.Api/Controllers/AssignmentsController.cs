@@ -18,7 +18,10 @@ namespace DailyNotes.Api.Controllers
             _context = context;
         }
 
-        /// <summary>GET /api/assignments?courseId=&status=&dueDate=</summary>
+        /// <summary>Retrieves all assignments, optionally filtered by course, status, or due date.</summary>
+        /// <param name="courseId">Filter assignments by course ID.</param>
+        /// <param name="status">Filter assignments by status (e.g., 'pending', 'submitted').</param>
+        /// <param name="dueDate">Filter assignments that are due on a specific date.</param>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Assignment>>> GetAll(
             [FromQuery] int? courseId,
@@ -39,6 +42,8 @@ namespace DailyNotes.Api.Controllers
             return await query.OrderBy(a => a.DueDate).ToListAsync();
         }
 
+        /// <summary>Retrieves a specific assignment by its ID.</summary>
+        /// <param name="id">The unique ID of the assignment.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<Assignment>> GetById(int id)
         {
@@ -50,6 +55,8 @@ namespace DailyNotes.Api.Controllers
             return assignment;
         }
 
+        /// <summary>Creates a new assignment.</summary>
+        /// <param name="assignment">The assignment data to be created.</param>
         [HttpPost]
         public async Task<ActionResult<Assignment>> Create(Assignment assignment)
         {
@@ -64,6 +71,9 @@ namespace DailyNotes.Api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = assignment.Id }, assignment);
         }
 
+        /// <summary>Updates an existing assignment record.</summary>
+        /// <param name="id">The ID of the assignment to update.</param>
+        /// <param name="assignment">The updated assignment data.</param>
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, Assignment assignment)
         {
@@ -90,6 +100,8 @@ namespace DailyNotes.Api.Controllers
             return NoContent();
         }
 
+        /// <summary>Deletes an assignment record.</summary>
+        /// <param name="id">The ID of the assignment to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import api from '../lib/api';
 import { format } from 'date-fns';
+import { formatDisplayDate } from '../lib/dateUtils';
 
 export default function DashboardPage() {
     const [greeting, setGreeting] = useState('');
@@ -76,7 +77,7 @@ export default function DashboardPage() {
                                     </div>
                                     {task.dueDate && (
                                         <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem', display: 'block' }}>
-                                            Due: {format(new Date(task.dueDate), 'MMM d')}
+                                            Due: {formatDisplayDate(task.dueDate, 'MMM d')}
                                         </span>
                                     )}
                                 </div>
@@ -99,7 +100,7 @@ export default function DashboardPage() {
                                     <span style={{ fontWeight: 500 }}>{task.name}</span>
                                     {task.dueDate && (
                                         <span style={{ fontSize: '0.8rem', color: 'var(--color-danger)', marginLeft: '0.5rem' }}>
-                                            (due {format(new Date(task.dueDate), 'MMM d')})
+                                            (due {formatDisplayDate(task.dueDate, 'MMM d')})
                                         </span>
                                     )}
                                 </div>

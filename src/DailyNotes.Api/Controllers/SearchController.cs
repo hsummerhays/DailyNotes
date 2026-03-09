@@ -17,7 +17,11 @@ namespace DailyNotes.Api.Controllers
             _context = context;
         }
 
-        /// <summary>GET /api/search?q=&type=all|notes|tasks|topics&dateFrom=&dateTo=&tags=</summary>
+        /// <summary>Performs a cross-entity search across notes, tasks, and topics.</summary>
+        /// <param name="q">The search query string.</param>
+        /// <param name="type">The type of items to search for ('all', 'notes', 'tasks', or 'topics').</param>
+        /// <param name="dateFrom">Optional start date filter for the search.</param>
+        /// <param name="dateTo">Optional end date filter for the search.</param>
         [HttpGet]
         public async Task<ActionResult<object>> Search(
             [FromQuery] string q,

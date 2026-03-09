@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
-import { format } from 'date-fns';
+import { formatDisplayDate } from '../lib/dateUtils';
 import Modal from '../components/Modal';
 import { useToast, ToastContainer } from '../components/Toast';
 
@@ -68,7 +68,7 @@ export default function PayPeriodsPage() {
     };
 
     const formatDate = (d: string) => {
-        try { return format(new Date(d), 'MMM d, yyyy'); } catch { return d; }
+        return formatDisplayDate(d);
     };
 
     return (

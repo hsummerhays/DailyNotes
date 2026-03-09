@@ -18,7 +18,7 @@ namespace DailyNotes.Api.Controllers
             _context = context;
         }
 
-        /// <summary>GET /api/tags</summary>
+        /// <summary>Retrieves all tags belonging to the current tenant.</summary>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Tag>>> GetAll()
         {
@@ -27,6 +27,8 @@ namespace DailyNotes.Api.Controllers
                 .ToListAsync();
         }
 
+        /// <summary>Retrieves a specific tag by its ID.</summary>
+        /// <param name="id">The unique ID of the tag.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<Tag>> GetById(int id)
         {
@@ -38,6 +40,8 @@ namespace DailyNotes.Api.Controllers
             return tag;
         }
 
+        /// <summary>Creates a new tag.</summary>
+        /// <param name="tag">The tag data to be created.</param>
         [HttpPost]
         public async Task<ActionResult<Tag>> Create(Tag tag)
         {
@@ -48,6 +52,9 @@ namespace DailyNotes.Api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = tag.Id }, tag);
         }
 
+        /// <summary>Updates an existing tag record.</summary>
+        /// <param name="id">The ID of the tag to update.</param>
+        /// <param name="tag">The updated tag data.</param>
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, Tag tag)
         {
@@ -67,6 +74,8 @@ namespace DailyNotes.Api.Controllers
             return NoContent();
         }
 
+        /// <summary>Deletes a tag record.</summary>
+        /// <param name="id">The ID of the tag to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
@@ -81,7 +90,9 @@ namespace DailyNotes.Api.Controllers
             return NoContent();
         }
 
-        /// <summary>POST /api/tags/{tagId}/items — tag an item</summary>
+        /// <summary>Associates a tag with a specific item (e.g., a note or task).</summary>
+        /// <param name="tagId">The ID of the tag.</param>
+        /// <param name="itemTag">The relation data specifying the item to be tagged.</param>
         [HttpPost("{tagId}/items")]
         public async Task<IActionResult> TagItem(int tagId, [FromBody] ItemTag itemTag)
         {
@@ -97,7 +108,10 @@ namespace DailyNotes.Api.Controllers
             return Ok(itemTag);
         }
 
-        /// <summary>DELETE /api/tags/{tagId}/items/{itemType}/{itemId} — untag an item</summary>
+        /// <summary>Removes a tag from a specific item.</summary>
+        /// <param name="tagId">The ID of the tag.</param>
+        /// <param name="itemType">The type of the item (e.g., 'work_note').</param>
+        /// <param name="itemId">The ID of the item.</param>
         [HttpDelete("{tagId}/items/{itemType}/{itemId}")]
         public async Task<IActionResult> UntagItem(int tagId, string itemType, int itemId)
         {
@@ -119,7 +133,8 @@ namespace DailyNotes.Api.Controllers
             return NoContent();
         }
 
-        /// <summary>GET /api/tags/{tagId}/items — all items with this tag</summary>
+        /// <summary>Retrieves all item associations for a specific tag.</summary>
+        /// <param name="tagId">The ID of the tag.</param>
         [HttpGet("{tagId}/items")]
         public async Task<ActionResult<IEnumerable<ItemTag>>> GetTaggedItems(int tagId)
         {

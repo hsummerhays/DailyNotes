@@ -18,7 +18,8 @@ namespace DailyNotes.Api.Controllers
             _context = context;
         }
 
-        /// <summary>GET /api/quiz-attempts?quizId= (history)</summary>
+        /// <summary>Retrieves the quiz attempt history for the current user, optionally filtered by quiz ID.</summary>
+        /// <param name="quizId">Filter history by a specific quiz.</param>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<QuizAttempt>>> GetAll([FromQuery] int? quizId)
         {
@@ -33,7 +34,8 @@ namespace DailyNotes.Api.Controllers
             return await query.OrderByDescending(a => a.StartedAt).ToListAsync();
         }
 
-        /// <summary>GET /api/quiz-attempts/{id} — attempt with answers</summary>
+        /// <summary>Retrieves a specific quiz attempt by its ID, including the user's submitted answers.</summary>
+        /// <param name="id">The unique ID of the quiz attempt.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<object>> GetById(int id)
         {
@@ -48,7 +50,8 @@ namespace DailyNotes.Api.Controllers
             return new { Attempt = attempt, Answers = answers };
         }
 
-        /// <summary>POST /api/quiz-attempts — submit a quiz attempt with answers</summary>
+        /// <summary>Submits a completed quiz attempt with all user answers for scoring.</summary>
+        /// <param name="submission">The quiz submission data containing the quiz ID and chosen options.</param>
         [HttpPost]
         public async Task<ActionResult<QuizAttempt>> Submit([FromBody] QuizSubmissionDto submission)
         {

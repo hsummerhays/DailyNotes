@@ -18,7 +18,11 @@ namespace DailyNotes.Api.Controllers
             _context = context;
         }
 
-        /// <summary>GET /api/work-days?date=2025-01-15&from=&to=</summary>
+        /// <summary>Retrieves all work days, optionally filtered by date or a date range.</summary>
+        /// <param name="date">Filter by a single specific date.</param>
+        /// <param name="from">The start date of a filter range.</param>
+        /// <param name="to">The end date of a filter range.</param>
+        /// <param name="all">If true, ignores date filters and returns all records.</param>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<WorkDay>>> GetAll(
             [FromQuery] DateOnly? date,
@@ -55,7 +59,7 @@ namespace DailyNotes.Api.Controllers
             return await query.OrderByDescending(w => w.WorkDate).ToListAsync();
         }
 
-        /// <summary>GET /api/work-days/today</summary>
+        /// <summary>Retrieves the work day record representing the current date.</summary>
         [HttpGet("today")]
         public async Task<ActionResult<WorkDay>> GetToday()
         {
@@ -70,7 +74,8 @@ namespace DailyNotes.Api.Controllers
             return workDay;
         }
 
-        /// <summary>GET /api/work-days/{id}</summary>
+        /// <summary>Retrieves a specific work day by its unique ID.</summary>
+        /// <param name="id">The unique ID of the work day.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<WorkDay>> GetById(int id)
         {
@@ -84,7 +89,8 @@ namespace DailyNotes.Api.Controllers
             return workDay;
         }
 
-        /// <summary>POST /api/work-days</summary>
+        /// <summary>Creates a new work day record.</summary>
+        /// <param name="workDay">The work day data to be created.</param>
         [HttpPost]
         public async Task<ActionResult<WorkDay>> Create(WorkDay workDay)
         {
@@ -99,7 +105,9 @@ namespace DailyNotes.Api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = workDay.Id }, workDay);
         }
 
-        /// <summary>PUT /api/work-days/{id}</summary>
+        /// <summary>Updates an existing work day record.</summary>
+        /// <param name="id">The ID of the work day to update.</param>
+        /// <param name="workDay">The updated work day data.</param>
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, WorkDay workDay)
         {
@@ -127,7 +135,8 @@ namespace DailyNotes.Api.Controllers
             return NoContent();
         }
 
-        /// <summary>DELETE /api/work-days/{id}</summary>
+        /// <summary>Deletes a work day record.</summary>
+        /// <param name="id">The ID of the record to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {

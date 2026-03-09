@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
-import { format } from 'date-fns';
+import { formatDisplayDate } from '../lib/dateUtils';
 import Modal from '../components/Modal';
 import { useToast, ToastContainer } from '../components/Toast';
 
@@ -87,11 +87,11 @@ export default function ProjectsPage() {
                                     <span className="badge badge-primary" style={{ marginLeft: '0.5rem' }}>{project.category || 'General'}</span>
                                 </div>
                                 <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '0.75rem' }}>
-                                    Created {format(new Date(project.createdAt), 'MMM d, yyyy')}
+                                    Created {formatDisplayDate(project.createdAt)}
                                 </div>
                                 {project.completedDate && (
                                     <span className="badge badge-success" style={{ marginBottom: '0.75rem', display: 'inline-flex' }}>
-                                        Completed {format(new Date(project.completedDate), 'MMM d, yyyy')}
+                                        Completed {formatDisplayDate(project.completedDate)}
                                     </span>
                                 )}
                                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>

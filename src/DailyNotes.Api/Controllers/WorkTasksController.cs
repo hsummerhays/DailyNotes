@@ -18,7 +18,9 @@ namespace DailyNotes.Api.Controllers
             _context = context;
         }
 
-        /// <summary>GET /api/work-tasks?status=in_progress&projectId=1</summary>
+        /// <summary>Retrieves all work tasks, optionally filtered by status or project.</summary>
+        /// <param name="status">Filter tasks by status (e.g., 'pending', 'completed').</param>
+        /// <param name="projectId">Filter tasks belonging to a specific project.</param>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<WorkTask>>> GetAll(
             [FromQuery] string? status,
@@ -35,7 +37,7 @@ namespace DailyNotes.Api.Controllers
             return await query.OrderByDescending(t => t.CreatedAt).ToListAsync();
         }
 
-        /// <summary>GET /api/work-tasks/overdue</summary>
+        /// <summary>Retrieves all overdue work tasks (due date in the past and not completed).</summary>
         [HttpGet("overdue")]
         public async Task<ActionResult<IEnumerable<WorkTask>>> GetOverdue()
         {
@@ -46,7 +48,8 @@ namespace DailyNotes.Api.Controllers
                 .ToListAsync();
         }
 
-        /// <summary>GET /api/work-tasks/{id}</summary>
+        /// <summary>Retrieves a specific work task by its ID.</summary>
+        /// <param name="id">The unique ID of the task.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<WorkTask>> GetById(int id)
         {
@@ -58,7 +61,8 @@ namespace DailyNotes.Api.Controllers
             return task;
         }
 
-        /// <summary>POST /api/work-tasks</summary>
+        /// <summary>Creates a new work task. A linked project is required.</summary>
+        /// <param name="workTask">The task to be created.</param>
         [HttpPost]
         public async Task<ActionResult<WorkTask>> Create(WorkTask workTask)
         {
@@ -76,7 +80,9 @@ namespace DailyNotes.Api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = workTask.Id }, workTask);
         }
 
-        /// <summary>PUT /api/work-tasks/{id}</summary>
+        /// <summary>Updates an existing work task.</summary>
+        /// <param name="id">The ID of the task to update.</param>
+        /// <param name="workTask">The updated task content.</param>
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, WorkTask workTask)
         {
@@ -105,7 +111,8 @@ namespace DailyNotes.Api.Controllers
             return NoContent();
         }
 
-        /// <summary>DELETE /api/work-tasks/{id}</summary>
+        /// <summary>Deletes a work task.</summary>
+        /// <param name="id">The ID of the task to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {

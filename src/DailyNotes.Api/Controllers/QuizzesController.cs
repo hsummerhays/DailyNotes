@@ -18,7 +18,9 @@ namespace DailyNotes.Api.Controllers
             _context = context;
         }
 
-        /// <summary>GET /api/quizzes?topicId=&difficulty=</summary>
+        /// <summary>Retrieves all quizzes, optionally filtered by topic or difficulty.</summary>
+        /// <param name="topicId">Filter quizzes by a specific topic.</param>
+        /// <param name="difficulty">Filter quizzes by difficulty level (1-5).</param>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Quiz>>> GetAll(
             [FromQuery] int? topicId,
@@ -35,7 +37,8 @@ namespace DailyNotes.Api.Controllers
             return await query.OrderByDescending(q => q.CreatedAt).ToListAsync();
         }
 
-        /// <summary>GET /api/quizzes/{id} — full quiz with questions and options</summary>
+        /// <summary>Retrieves a full quiz by its ID, including all questions and available options.</summary>
+        /// <param name="id">The unique ID of the quiz.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<object>> GetById(int id)
         {
@@ -66,6 +69,8 @@ namespace DailyNotes.Api.Controllers
             };
         }
 
+        /// <summary>Creates a new quiz.</summary>
+        /// <param name="quiz">The quiz data to be created.</param>
         [HttpPost]
         public async Task<ActionResult<Quiz>> Create(Quiz quiz)
         {
@@ -78,6 +83,9 @@ namespace DailyNotes.Api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = quiz.Id }, quiz);
         }
 
+        /// <summary>Updates an existing quiz.</summary>
+        /// <param name="id">The ID of the quiz to update.</param>
+        /// <param name="quiz">The updated quiz data.</param>
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, Quiz quiz)
         {
@@ -98,6 +106,8 @@ namespace DailyNotes.Api.Controllers
             return NoContent();
         }
 
+        /// <summary>Deletes a quiz and all its associated questions and options.</summary>
+        /// <param name="id">The ID of the quiz to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
@@ -112,7 +122,9 @@ namespace DailyNotes.Api.Controllers
             return NoContent();
         }
 
-        /// <summary>POST /api/quizzes/{quizId}/questions</summary>
+        /// <summary>Adds a new question to a specific quiz.</summary>
+        /// <param name="quizId">The ID of the quiz.</param>
+        /// <param name="question">The question data to be added.</param>
         [HttpPost("{quizId}/questions")]
         public async Task<ActionResult<QuizQuestion>> AddQuestion(int quizId, QuizQuestion question)
         {
@@ -128,7 +140,9 @@ namespace DailyNotes.Api.Controllers
             return Ok(question);
         }
 
-        /// <summary>POST /api/quizzes/questions/{questionId}/options</summary>
+        /// <summary>Adds a new option to a specific quiz question.</summary>
+        /// <param name="questionId">The ID of the quiz question.</param>
+        /// <param name="option">The option data to be added.</param>
         [HttpPost("questions/{questionId}/options")]
         public async Task<ActionResult<QuizOption>> AddOption(int questionId, QuizOption option)
         {

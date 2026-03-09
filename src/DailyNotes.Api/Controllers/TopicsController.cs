@@ -18,7 +18,8 @@ namespace DailyNotes.Api.Controllers
             _context = context;
         }
 
-        /// <summary>GET /api/topics?parentId= (hierarchical)</summary>
+        /// <summary>Retrieves all topics, optionally filtered by a parent topic ID for hierarchy navigation.</summary>
+        /// <param name="parentId">The ID of the parent topic. If null, root topics are returned.</param>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Topic>>> GetAll([FromQuery] int? parentId)
         {
@@ -32,7 +33,8 @@ namespace DailyNotes.Api.Controllers
             return await query.OrderBy(t => t.Title).ToListAsync();
         }
 
-        /// <summary>GET /api/topics/{id}</summary>
+        /// <summary>Retrieves a specific topic by its ID.</summary>
+        /// <param name="id">The unique ID of the topic.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<Topic>> GetById(int id)
         {
@@ -44,7 +46,8 @@ namespace DailyNotes.Api.Controllers
             return topic;
         }
 
-        /// <summary>GET /api/topics/{id}/children — subtopics</summary>
+        /// <summary>Retrieves all child topics (subtopics) for a given topic.</summary>
+        /// <param name="id">The ID of the parent topic.</param>
         [HttpGet("{id}/children")]
         public async Task<ActionResult<IEnumerable<Topic>>> GetChildren(int id)
         {
@@ -60,7 +63,8 @@ namespace DailyNotes.Api.Controllers
                 .ToListAsync();
         }
 
-        /// <summary>GET /api/topics/{id}/notes</summary>
+        /// <summary>Retrieves all notes associated with a specific topic.</summary>
+        /// <param name="id">The ID of the topic.</param>
         [HttpGet("{id}/notes")]
         public async Task<ActionResult<IEnumerable<TopicNote>>> GetTopicNotes(int id)
         {
@@ -78,6 +82,8 @@ namespace DailyNotes.Api.Controllers
                 .ToListAsync();
         }
 
+        /// <summary>Creates a new topic.</summary>
+        /// <param name="topic">The topic data to be created.</param>
         [HttpPost]
         public async Task<ActionResult<Topic>> Create(Topic topic)
         {
@@ -92,6 +98,9 @@ namespace DailyNotes.Api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = topic.Id }, topic);
         }
 
+        /// <summary>Updates an existing topic.</summary>
+        /// <param name="id">The ID of the topic to update.</param>
+        /// <param name="topic">The updated topic data.</param>
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, Topic topic)
         {
@@ -117,6 +126,8 @@ namespace DailyNotes.Api.Controllers
             return NoContent();
         }
 
+        /// <summary>Deletes a topic and its associated subtopics/notes (depending on cascade rules).</summary>
+        /// <param name="id">The ID of the topic to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {

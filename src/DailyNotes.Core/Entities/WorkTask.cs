@@ -10,7 +10,7 @@ namespace DailyNotes.Core.Entities
         public string UserId { get; set; } = string.Empty;
         public string Visibility { get; set; } = "private";
         public string Name { get; set; } = string.Empty;
-        public string Status { get; set; } = "pending"; // 'pending' | 'in_progress' | 'completed' | 'on_hold'
+        public string Status { get; set; } = "pending"; // 'pending' | 'in_progress' | 'completed'
         public string? Comments { get; set; }
         public DateOnly? StartDate { get; set; }
         public DateOnly? DueDate { get; set; }

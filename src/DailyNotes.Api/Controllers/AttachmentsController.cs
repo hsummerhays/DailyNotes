@@ -18,7 +18,9 @@ namespace DailyNotes.Api.Controllers
             _context = context;
         }
 
-        /// <summary>GET /api/attachments?itemType=work_note&itemId=1</summary>
+        /// <summary>Retrieves all attachments, optionally filtered by item type and item ID.</summary>
+        /// <param name="itemType">The type of the item the attachment belongs to (e.g., 'work_note').</param>
+        /// <param name="itemId">The ID of the item the attachment belongs to.</param>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Attachment>>> GetAll(
             [FromQuery] string? itemType,
@@ -35,6 +37,8 @@ namespace DailyNotes.Api.Controllers
             return await query.OrderByDescending(a => a.CreatedAt).ToListAsync();
         }
 
+        /// <summary>Retrieves a specific attachment by its ID.</summary>
+        /// <param name="id">The unique ID of the attachment.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<Attachment>> GetById(int id)
         {
@@ -46,7 +50,8 @@ namespace DailyNotes.Api.Controllers
             return attachment;
         }
 
-        /// <summary>POST /api/attachments — metadata-only create (file upload handled by storage provider)</summary>
+        /// <summary>Creates a new attachment record (metadata only). File upload should be handled by a storage provider.</summary>
+        /// <param name="attachment">The attachment data to be created.</param>
         [HttpPost]
         public async Task<ActionResult<Attachment>> Create(Attachment attachment)
         {
@@ -60,6 +65,8 @@ namespace DailyNotes.Api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = attachment.Id }, attachment);
         }
 
+        /// <summary>Deletes an attachment record.</summary>
+        /// <param name="id">The ID of the attachment to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
