@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -85,7 +85,7 @@ else
 
 int tenantId = tenant.Id;
 // ── Get or Create User ───────────────────────────────────────────
-string userEmail = "hsummerhays1@gmail.com";
+string userEmail = "test@example.com";
 var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
 var user = await userManager.FindByEmailAsync(userEmail);
 
@@ -342,8 +342,6 @@ if (File.Exists(workDaysFile))
 var notesFile = Path.Combine(csvDir, "Notes.csv");
 if (File.Exists(notesFile))
 {
-    Console.Write("Importing Notes...");
-
     // Cache existing WorkDates to avoid FK violations
     var existingDates = new HashSet<DateOnly>(await db.WorkDays.Select(w => w.WorkDate).ToListAsync());
 
@@ -409,12 +407,12 @@ if (File.Exists(notesFile))
         if (count % 1000 == 0)
         {
             await db.SaveChangesAsync();
-            Console.Write($"\rImporting Notes... {count:N0}");
+            Console.WriteLine($"Importing Notes... {count:N0}");
         }
     }
     await db.SaveChangesAsync();
     Console.ForegroundColor = ConsoleColor.Green;
-    Console.WriteLine($"\rImporting Notes... {count:N0} records");
+    Console.WriteLine($"Importing Notes... {count:N0} records");
     Console.ResetColor();
     totalImported += count;
 }
