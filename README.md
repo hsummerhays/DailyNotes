@@ -75,3 +75,6 @@ This project is configured for **Remote - Containers**. This allows you to devel
 - `.devcontainer/`: Configuration for VS Code Dev Containers.
 - `docker-compose.yml`: Definition for multi-container Docker application.
 
+> [!WARNING]
+> The default `docker-compose.yml` uses `password` as the PostgreSQL password. This is fine for local development, but **must be changed** before any real deployment. See the [Environment Setup Guide](docs/Environment_Setup_Guide.md) for configuration details.
+
