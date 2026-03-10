@@ -8,6 +8,13 @@ DailyNotes is a cloud-native note-taking application designed for flexibility an
 - [Docker Desktop](https://www.docker.com/products/docker-desktop) (Optional, but recommended for consistent environment)
 - [VS Code](https://code.visualstudio.com/) (Recommended)
 
+## Documentation
+
+For a deeper dive into the architecture, future plans, and setting up the local environment, see the following documentation:
+- [Environment Setup Guide](docs/Environment_Setup_Guide.md)
+- [Architecture & Implementation Plan](docs/architecture.md)
+- [Future Roadmap](docs/roadmap.md)
+
 ## Getting Started
 
 We provide helper scripts for Windows (PowerShell) and Mac/Linux (Bash) to make development easy.
@@ -63,6 +70,7 @@ This project is configured for **Remote - Containers**. This allows you to devel
 ## Project Structure
 
 - `src/`: Source code for the application.
+- `docs/`: Project documentation.
 - `scripts/`: Helper scripts for build and run tasks.
 - `.devcontainer/`: Configuration for VS Code Dev Containers.
 - `docker-compose.yml`: Definition for multi-container Docker application.
