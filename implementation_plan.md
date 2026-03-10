@@ -48,7 +48,7 @@ erDiagram
 ## Proposed Solution Architecture
 
 ```
-c:\HughApps\DailyNotes\
+./
 ├── DailyNotes.sln
 ├── src/
 │   ├── DailyNotes.Api/           # .NET 8 Web API
@@ -69,7 +69,7 @@ c:\HughApps\DailyNotes\
 
 ### 1. Core Domain Layer
 
-#### [NEW] [DailyNotes.Core](file:///c:/HughApps/DailyNotes/src/DailyNotes.Core)
+#### [NEW] [DailyNotes.Core](./src/DailyNotes.Core)
 
 Class library containing entities, DTOs, and interfaces — no external dependencies.
 
@@ -114,7 +114,7 @@ Class library containing entities, DTOs, and interfaces — no external dependen
 
 ### 2. Infrastructure Layer
 
-#### [NEW] [DailyNotes.Infrastructure](file:///c:/HughApps/DailyNotes/src/DailyNotes.Infrastructure)
+#### [NEW] [DailyNotes.Infrastructure](./src/DailyNotes.Infrastructure)
 
 - **EF Core 8** with `Npgsql` provider
 - `DailyNotesDbContext` with entity configurations (extends `IdentityDbContext`)
@@ -465,7 +465,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 ### 3. API Layer
 
-#### [NEW] [DailyNotes.Api](file:///c:/HughApps/DailyNotes/src/DailyNotes.Api)
+#### [NEW] [DailyNotes.Api](./src/DailyNotes.Api)
 
 .NET 8 Minimal API or Controllers exposing RESTful endpoints:
 
@@ -504,7 +504,7 @@ All endpoints except Auth require `[Authorize]` with a valid JWT Bearer token **
 
 ### 4. React Frontend + Tailwind CSS
 
-#### [NEW] [daily-notes-ui](file:///c:/HughApps/DailyNotes/src/daily-notes-ui)
+#### [NEW] [daily-notes-ui](./src/daily-notes-ui)
 
 React 18+ SPA created via **Vite** (`npm create vite@latest`), TypeScript, styled with **Tailwind CSS**.
 
@@ -596,55 +596,7 @@ React 18+ SPA created via **Vite** (`npm create vite@latest`), TypeScript, style
 6. Webhook dispatch on CRUD events (fires `webhook_subscriptions`)
 7. Offline sync queue + conflict resolution (last-write-wins with user override)
 
----
 
-## Future Roadmap
-
-| Feature | Description |
-|---|---|
-| **Jira Integration** | Sync tasks/time entries with Jira issues, log work via `external_source`/`external_id` linkage |
-| **Salesforce Integration** | Link notes/tasks to Salesforce cases or opportunities |
-| **Open Source Tools** | GitLab, Redmine, OpenProject — same adapter pattern via `integration_connections` |
-| **AI / MCP Integration** | Autocompletion, summaries, plus KB: AI-generated quizzes, semantic search, gap analysis, OCR, speech-to-text |
-| **Semantic Search** | pgvector embeddings for natural language queries across all content |
-| **MCP Server** | Expose DailyNotes tools to AI agents: search_notes, create_note, quiz_me, summarize_topic, etc. |
-| **MCP Client** | DailyNotes calls AI models for summarization, quiz generation, OCR, transcription |
-| **Developer Portal** | API key management, Swagger docs, webhook subscription UI |
-| **No-Code Automation** | Zapier, Power Automate, n8n — connect via API keys + webhooks |
-| **Export** | Replicate FileMaker export scripts — CSV/Excel export by date range, project, task |
-| **MS Teams Bot** | Slash commands (`/dailynotes log`), meeting auto-notes, channel digests via Bot Framework |
-| **Slack Bot** | Slash commands, note notifications, daily summaries via Bolt SDK |
-| **Zoom** | Webhook on meeting end → auto-create note with duration, attach transcript |
-| **Discord** | Bot commands + notifications for smaller/dev teams |
-| **Gmail Integration** | Inbound: import emails as notes via Gmail API; Outbound: send digests; OAuth 2.0 via Google Cloud |
-| **Outlook Integration** | Inbound/outbound via Microsoft Graph API (shares OAuth with Entra ID + Office 365) |
-| **Browser Extension** | "Save to DailyNotes" button in Gmail/Outlook web — clips email as a work note |
-| **VS Code Extension** | Sidebar panel, status bar timer, slash commands, git commit auto-logging — thin client over existing API |
-| **Google Calendar Sync** | Two-way sync of work day time entries with Google Calendar events |
-| **Google Docs** | Link/embed Google Docs via Drive API Picker, stored as cloud attachments |
-| **Office 365** | Link/embed OneDrive/SharePoint docs via Microsoft Graph API |
-| **Microsoft Entra ID** | Replace JWT auth with Entra ID (migration path documented in code) |
-| **Monthly Goals** | Restore deferred Monthly Goals & Monthly Goal Tasks tables |
-| **Spaced Repetition** | Auto-resurface quiz questions based on forgetting curves |
-| **Grade Calculator** | Weighted GPA tracking, what-if grade scenarios |
-| **Study Planner** | AI-suggested study blocks based on due dates + quiz performance |
-| **Flashcards** | AI-generated flashcards from topic notes via MCP |
-| **LMS Integration** | Google Classroom, Canvas, Blackboard — sync courses/assignments |
-| **LinkedIn Learning** | OAuth sync: enrolled courses, completion %, certificates via LinkedIn API |
-| **Udemy** | Sync enrolled courses + progress via Udemy API |
-| **Coursera** | Course catalog + completion via partner API |
-| **Pluralsight** | Skill IQ scores, course history, skill assessments |
-| **OCR** | Azure AI Vision / Google Cloud Vision — handwriting → searchable text |
-| **Speech-to-Text** | Azure Speech / Whisper API — voice notes → transcribed text |
-| **Live Dictation** | Real-time transcription while speaking → text in Tiptap |
-| **reMarkable Sync** | Import handwritten pages via reMarkable Cloud API → OCR |
-| **OneNote Sync** | Two-way sync via Microsoft Graph API |
-| **Capacitor** | Native iOS/Android shell for app store distribution + full native APIs |
-| **Push Notifications** | Web Push (VAPID) + Capacitor Push plugin for native |
-| **GitHub Actions CI** | Automated build, test, Docker publish on push/PR |
-| **Contributor Docs** | Docusaurus site with architecture guides, API reference |
-
----
 
 ## Verification Plan
 
@@ -681,25 +633,25 @@ This plan aims to make the "DailyNotes" project easy to build and run on Windows
 
 ### Root Directory
 
-#### [NEW] [.devcontainer/devcontainer.json](file:///c:/HughApps/DailyNotes/.devcontainer/devcontainer.json)
+#### [NEW] [.devcontainer/devcontainer.json](./.devcontainer/devcontainer.json)
 - Configures a Dev Container using the official .NET 8 image.
 - Installs necessary VS Code extensions (C#, Docker).
 - Sets up port forwarding and environment variables.
 
-#### [NEW] [README.md](file:///c:/HughApps/DailyNotes/README.md)
+#### [NEW] [README.md](./README.md)
 - detailed "Getting Started" guide for Windows, Mac, and Linux.
 - Instructions for using the new scripts and Dev Container.
 
 ### Scripts Directory (`scripts/`)
 
-#### [NEW] [scripts/init.sh](file:///c:/HughApps/DailyNotes/scripts/init.sh) & [scripts/init.ps1](file:///c:/HughApps/DailyNotes/scripts/init.ps1)
+#### [NEW] [scripts/init.sh](./scripts/init.sh) & [scripts/init.ps1](./scripts/init.ps1)
 - Restores .NET dependencies.
 - Checks for Docker availability.
 
-#### [NEW] [scripts/build.sh](file:///c:/HughApps/DailyNotes/scripts/build.sh) & [scripts/build.ps1](file:///c:/HughApps/DailyNotes/scripts/build.ps1)
+#### [NEW] [scripts/build.sh](./scripts/build.sh) & [scripts/build.ps1](./scripts/build.ps1)
 - Builds the solution/project using `dotnet build`.
 
-#### [NEW] [scripts/run.sh](file:///c:/HughApps/DailyNotes/scripts/run.sh) & [scripts/run.ps1](file:///c:/HughApps/DailyNotes/scripts/run.ps1)
+#### [NEW] [scripts/run.sh](./scripts/run.sh) & [scripts/run.ps1](./scripts/run.ps1)
 - Wrapper around `docker-compose up` to start the database and API.
 - Alternatively, provides a mode to run locally with `dotnet run` if preferred (will default to Docker for consistency).
 
