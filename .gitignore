@@ -19,3 +19,9 @@ docker-compose.override.yml
 # OS
 .DS_Store
 Thumbs.db
+
+# SQL
+*.sql
+
+.agents/
+.devcontainer/
