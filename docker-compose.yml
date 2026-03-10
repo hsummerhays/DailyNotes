@@ -19,6 +19,7 @@ services:
     environment:
       - ConnectionStrings__DefaultConnection=Host=postgres;Database=DailyNotes;Username=postgres;Password=password
       - ASPNETCORE_ENVIRONMENT=Development
+      - Jwt__Key=${JWT_KEY:?JWT_KEY environment variable is required}
     ports:
       - "5010:8080"
     depends_on:

@@ -28,7 +28,8 @@ const queryClient = new QueryClient({
 });
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isHydrating } = useAuthStore();
+  if (isHydrating) return null;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
@@ -38,7 +39,7 @@ export default function App() {
 
   useEffect(() => {
     hydrate();
-  }, []);
+  }, [hydrate]);
 
   return (
     <QueryClientProvider client={queryClient}>

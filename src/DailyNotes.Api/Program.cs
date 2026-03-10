@@ -7,15 +7,12 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Net;
+using System.Threading.RateLimiting;
 using DailyNotes.Core.Interfaces;
 using DailyNotes.Infrastructure.Services;
 using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
-if (builder.Environment.IsDevelopment())
-{
-    File.WriteAllText("env_debug.txt", $"Environment: {builder.Environment.EnvironmentName}\n");
-}
 
 // Add services to the container.
 
@@ -95,6 +92,18 @@ builder.Services.AddCors(options =>
               .AllowCredentials());
 });
 
+// Rate Limiting
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddFixedWindowLimiter("auth", limiterOptions =>
+    {
+        limiterOptions.PermitLimit = 10;
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+        limiterOptions.QueueLimit = 0;
+    });
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+});
+
 // Services
 builder.Services.AddScoped<IAuthService, AuthService>();
 
@@ -124,6 +133,7 @@ app.UseExceptionHandler(errorApp =>
 });
 
 app.UseCors("AllowDevClient");
+app.UseRateLimiter();
 
 if (app.Environment.IsDevelopment())
 {

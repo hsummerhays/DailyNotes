@@ -5,8 +5,8 @@ namespace DailyNotes.Core.Interfaces
 {
     public interface IAuthService
     {
-        Task<AuthResponseDto> RegisterAsync(RegisterDto model);
-        Task<AuthResponseDto> LoginAsync(LoginDto model);
-        Task<AuthResponseDto> RefreshTokenAsync(string refreshToken);
+        Task<AuthResult> RegisterAsync(RegisterDto model);
+        Task<AuthResult> LoginAsync(LoginDto model);
+        Task<AuthResult> RefreshTokenAsync(string refreshToken);
     }
 }

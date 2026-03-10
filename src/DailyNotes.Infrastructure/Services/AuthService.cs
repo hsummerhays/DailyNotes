@@ -32,7 +32,7 @@ namespace DailyNotes.Infrastructure.Services
             _configuration = configuration;
         }
 
-        public async Task<AuthResponseDto> RegisterAsync(RegisterDto model)
+        public async Task<AuthResult> RegisterAsync(RegisterDto model)
         {
             // 1. Create Identity User
             var user = new IdentityUser
@@ -50,7 +50,7 @@ namespace DailyNotes.Infrastructure.Services
             }
 
             // 2. Create Tenant
-            var tenantName = !string.IsNullOrWhiteSpace(model.TenantName) ? model.TenantName : $"{model.Email}'s Workspace";
+            var tenantName = !string.IsNullOrWhiteSpace(model.DisplayName) ? model.DisplayName : $"{model.Email}'s Workspace";
             var tenant = new Tenant
             {
                 Name = tenantName
@@ -75,7 +75,7 @@ namespace DailyNotes.Infrastructure.Services
             return await GenerateAuthResponse(user, tenant.Id, "owner");
         }
 
-        public async Task<AuthResponseDto> LoginAsync(LoginDto model)
+        public async Task<AuthResult> LoginAsync(LoginDto model)
         {
             // 1. Validate User
             var user = await _userManager.FindByEmailAsync(model.Email);
@@ -96,7 +96,7 @@ namespace DailyNotes.Infrastructure.Services
             return await GenerateAuthResponse(user, tenantUser.TenantId, tenantUser.Role);
         }
 
-        public async Task<AuthResponseDto> RefreshTokenAsync(string refreshToken)
+        public async Task<AuthResult> RefreshTokenAsync(string refreshToken)
         {
             // Look up the user directly via the asp_net_user_tokens table — O(1) indexed query
             var tokenRecord = await _context.UserTokens
@@ -123,11 +123,11 @@ namespace DailyNotes.Infrastructure.Services
             return await GenerateAuthResponse(foundUser, tenantUser.TenantId, tenantUser.Role);
         }
 
-        private async Task<AuthResponseDto> GenerateAuthResponse(IdentityUser user, int tenantId, string role)
+        private async Task<AuthResult> GenerateAuthResponse(IdentityUser user, int tenantId, string role)
         {
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"] ?? throw new Exception("JWT Key not configured")));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-            var expiry = DateTime.UtcNow.AddDays(7);
+            var expiry = DateTime.UtcNow.AddHours(1);
 
             var claims = new List<Claim>
             {
@@ -146,17 +146,20 @@ namespace DailyNotes.Infrastructure.Services
                 signingCredentials: creds
             );
 
-            // Generate and store refresh token
-            var refreshToken = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(64));
-            await _userManager.SetAuthenticationTokenAsync(user, "DailyNotes", "RefreshToken", refreshToken);
+            var rawRefreshToken = Convert.ToBase64String(
+                System.Security.Cryptography.RandomNumberGenerator.GetBytes(64));
+            await _userManager.SetAuthenticationTokenAsync(user, "DailyNotes", "RefreshToken", rawRefreshToken);
 
-            return new AuthResponseDto
+            return new AuthResult
             {
-                Token = new JwtSecurityTokenHandler().WriteToken(token),
-                RefreshToken = refreshToken,
-                Expiration = expiry,
-                TenantId = tenantId.ToString(),
-                Role = role
+                Response = new AuthResponseDto
+                {
+                    Token = new JwtSecurityTokenHandler().WriteToken(token),
+                    Expiration = expiry,
+                    TenantId = tenantId.ToString(),
+                    Role = role
+                },
+                RefreshToken = rawRefreshToken
             };
         }
     }
