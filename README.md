@@ -2,18 +2,32 @@
 
 DailyNotes is a cloud-native note-taking application designed for flexibility and ease of use.
 
-## Prerequisites
+## Architecture Principles
+
+DailyNotes is designed using a few core architectural principles:
+
+**Clean Separation of Concerns**  
+Domain entities and business rules live in `DailyNotes.Core` and have no infrastructure dependencies.
+
+**Cloud-Native by Default**  
+The application is containerized and designed to run locally via Docker or in cloud environments with minimal changes.
+
+**Database-First Migration Strategy**  
+The system preserves the structure and relationships of the original FileMaker data while modernizing the application architecture.
+
+**Multi-Tenant Ready**  
+All domain entities include tenant boundaries, enabling SaaS deployment without redesign.
+
+**Provider Abstraction**  
+External services such as file storage, email, speech, and AI are accessed through interfaces so implementations can be swapped without affecting the domain layer.
+
+## Tech Stack
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop) (Optional, but recommended for consistent environment)
-- [VS Code](https://code.visualstudio.com/) (Recommended)
-
-## Documentation
-
-For a deeper dive into the architecture, future plans, and setting up the local environment, see the following documentation:
-- [Environment Setup Guide](docs/Environment_Setup_Guide.md)
-- [Architecture & Implementation Plan](docs/architecture.md)
-- [Future Roadmap](docs/roadmap.md)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop) (Used for local PostgreSQL and optional containerized stack)
+- [React 19](https://react.dev/) / [Vite](https://vitejs.dev/) / [TypeScript](https://www.typescriptlang.org/)
+- [PostgreSQL](https://www.postgresql.org/) / [Entity Framework Core 10](https://learn.microsoft.com/en-us/ef/core/)
+- [VS Code](https://code.visualstudio.com/) (Recommended IDE)
 
 ## Getting Started
 
@@ -59,7 +73,7 @@ We provide helper scripts for Windows (PowerShell) and Mac/Linux (Bash) to make 
         ./scripts/run.sh --local
         ```
 
-## Development with Dev Containers
+### Development with Dev Containers
 
 This project is configured for **Remote - Containers**. This allows you to develop inside a Docker container with all dependencies pre-installed.
 
@@ -67,7 +81,7 @@ This project is configured for **Remote - Containers**. This allows you to devel
 2.  Open the project folder in VS Code.
 3.  Click "Reopen in Container" when prompted, or run the command `Dev Containers: Reopen in Container` from the Command Palette (`Ctrl+Shift+P`).
 
-## Project Structure
+### Project Structure
 
 - `src/`: Source code for the application.
 - `docs/`: Project documentation.
@@ -78,3 +92,9 @@ This project is configured for **Remote - Containers**. This allows you to devel
 > [!WARNING]
 > The default `docker-compose.yml` uses `password` as the PostgreSQL password. This is fine for local development, but **must be changed** before any real deployment. See the [Environment Setup Guide](docs/Environment_Setup_Guide.md) for configuration details.
 
+## Docs
+
+For a deeper dive into the architecture, future plans, and setting up the local environment, see the following documentation:
+- [Environment Setup Guide](docs/Environment_Setup_Guide.md)
+- [Architecture & Implementation Plan](docs/architecture.md)
+- [Future Roadmap](docs/roadmap.md)

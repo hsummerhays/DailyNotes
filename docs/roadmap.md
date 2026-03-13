@@ -69,7 +69,7 @@ This document outlines the planned integrations, features, and enhancements for 
 |---|---|
 | **OCR** | Azure AI Vision / Google Cloud Vision — handwriting → searchable text |
 | **Speech-to-Text** | Azure Speech / Whisper API — voice notes → transcribed text |
-| **Live Dictation** | Real-time transcription while speaking → text in Tiptap |
+| **Live Dictation** | Real-time transcription while speaking → text in Lexical |
 | **reMarkable Sync** | Import handwritten pages via reMarkable Cloud API → OCR |
 | **OneNote Sync** | Two-way sync via Microsoft Graph API |
 

@@ -1,67 +1,34 @@
-# DailyNotes: Migrate FileMaker to .NET 8 + Angular + Tailwind CSS + PostgreSQL
-
-Migrate the existing **Work Days** FileMaker Pro database (7 tables, ~60K total records) to a modern full-stack application using **.NET 8 Web API**, **Angular + Tailwind CSS**, and **PostgreSQL**.
-
----
-
-## Existing FileMaker Schema Summary
-
-The DDR reveals a **daily work-tracking application** with time tracking, task/project management, notes, pay periods, and monthly goal tracking.
-
-### Tables & Record Counts
-
-| Table | Fields | Records | Purpose |
-|---|---|---|---|
-| **Work Days** | 27 | 5,853 | Daily time in/out (3 sessions), breaks, hours |
-| **Tasks** | 25 | 509 | Task tracking with project linkage, status flags |
-| **Notes** | 21 | 54,436 | Time entries per task per day (the core work log) |
-| **Projects** | 8 | 27 | Project/client grouping for tasks |
-| **Pay Period** | 13 | 554 | Semi-monthly pay period summaries |
-| ~~Monthly Goals~~ | 11 | 0 | *Deferred* |
-| ~~Monthly Goal Tasks~~ | 7 | 0 | *Deferred* |
+DailyNotes is a cloud-native productivity and knowledge management platform designed to replace a legacy FileMaker Pro work-tracking system.
 
 ### Key Relationships
 
 ```mermaid
 erDiagram
-    Projects ||--o{ Tasks : "Project ID"
-    Tasks ||--o{ Notes : "Task ID"
-    WorkDays ||--o{ Notes : "Date"
-    PayPeriod ||--o{ WorkDays : "Pay Period date"
+    Project ||--o{ WorkTask : "Project ID"
+    WorkTask ||--o{ WorkNote : "Task ID"
+    WorkDay ||--o{ WorkNote : "Date"
+    PayPeriod ||--o{ WorkDay : "Pay Period date"
 ```
-
----
-
-## User Review Required
-
-> [!NOTE]
-> **Monthly Goals & Monthly Goal Tasks** — Deferred from initial scope (0 records, can be added later).
-
-> [!NOTE]
-> **Authentication** — ASP.NET Core Identity + JWT, with code-level documentation for migrating to Microsoft Entra ID.
-
-> [!NOTE]
-> **Data migration** — One-time CSV import tool to seed Postgres from exported FileMaker data.
 
 ---
 
 ## Proposed Solution Architecture
 
-```
 ./
-├── DailyNotes.sln
+├── DailyNotes.slnx
 ├── src/
-│   ├── DailyNotes.Api/           # .NET 8 Web API
+│   ├── DailyNotes.Api/           # .NET 10 Web API
+│   ├── DailyNotes.Api.Tests/     # xUnit integration/unit tests (under src/)
 │   ├── DailyNotes.Core/          # Entities, interfaces, DTOs
 │   ├── DailyNotes.Infrastructure/# EF Core, Postgres, cloud providers
 │   ├── DailyNotes.Import/        # CSV import console tool
 │   └── daily-notes-ui/           # React + Vite + TypeScript SPA
-├── tests/
-│   └── DailyNotes.Api.Tests/     # xUnit integration/unit tests
+├── docs/                         # Project documentation
+├── scripts/                      # Helper scripts (init, build, run)
+├── dataImport/                   # Sample data for import
 ├── Dockerfile                    # Multi-stage build (API + UI)
 ├── docker-compose.yml            # Local dev: API + Postgres + UI
 └── .github/workflows/ci.yml      # GitHub Actions CI/CD
-```
 
 ---
 
@@ -116,7 +83,7 @@ Class library containing entities, DTOs, and interfaces — no external dependen
 
 #### [NEW] [DailyNotes.Infrastructure](./src/DailyNotes.Infrastructure)
 
-- **EF Core 8** with `Npgsql` provider
+- **EF Core 10** with `Npgsql` provider
 - `DailyNotesDbContext` with entity configurations (extends `IdentityDbContext`)
 - **ASP.NET Core Identity** user/role tables stored in the same Postgres database
 - Repository pattern (or direct DbContext usage)
@@ -467,7 +434,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 #### [NEW] [DailyNotes.Api](./src/DailyNotes.Api)
 
-.NET 8 Minimal API or Controllers exposing RESTful endpoints:
+.NET 10 Minimal API or Controllers exposing RESTful endpoints:
 
 | Resource | Endpoints |
 |---|---|
@@ -517,14 +484,14 @@ React 18+ SPA created via **Vite** (`npm create vite@latest`), TypeScript, style
 **Styling & Libraries:**
 - Tailwind CSS 3 for utility-first styling
 - **shadcn/ui + Radix UI** — accessible, beautiful component library
-- **Tiptap** (`@tiptap/react`) — headless rich text editor for notes, styled with Tailwind
+- **Lexical** (`lexical`) — extensible text editor framework for notes, styled with Tailwind
   - Note content stored as **JSON** in Postgres (`content JSONB`), rendered client-side
   - AI-ready extension model for future MCP autocompletion/summarization
 - Custom color palette and design tokens in `tailwind.config.js`
 - Responsive layouts via Tailwind breakpoints (`sm`: phone, `md`: tablet, `lg`: laptop, `xl`: desktop)
 - **Mobile-first design:** bottom navigation on small screens, collapsible sidebar on medium, persistent sidebar on large
-- **Document handling:** drag-and-drop files into Tiptap, `.docx` import via Mammoth.js, `.xlsx` preview via SheetJS
-- **Voice recording:** `MediaRecorder` API in Tiptap toolbar — record, upload, embed inline audio player
+- **Document handling:** drag-and-drop files into Lexical, `.docx` import via Mammoth.js, `.xlsx` preview via SheetJS
+- **Voice recording:** `MediaRecorder` API in Lexical toolbar — record, upload, embed inline audio player
 - **Drawing canvas:** `perfect-freehand` library for pressure-sensitive stylus input (iPad, Surface, Samsung, Wacom) — export as SVG/PNG
 
 **State Management:**
@@ -540,7 +507,7 @@ React 18+ SPA created via **Vite** (`npm create vite@latest`), TypeScript, style
 | **Work Days** | List/detail views with calendar navigation, monthly view |
 | **Tasks** | List (filterable by status), detail with linked notes |
 | **Projects** | List with nested tasks, total days/hours |
-| **Notes** | Tiptap rich text editor for add/edit, inline from work day or standalone |
+| **Notes** | Lexical rich text editor for add/edit, inline from work day or standalone |
 | **Knowledge Base** | Topic tree, notes, tags, quizzes (create/take), skill progress dashboard |
 | **Education** | Course list, assignment tracker with due dates, grade overview |
 | **Search** | Global search bar (`Ctrl+K`), faceted filters (type, date, tags, status), highlighted results |
@@ -574,9 +541,9 @@ React 18+ SPA created via **Vite** (`npm create vite@latest`), TypeScript, style
 2. Implement login/register pages + `useAuth()` hook + JWT interceptor
 3. Auto-generate typed API client from OpenAPI spec
 4. Implement Dashboard (today's work day view)
-5. Implement Work Day detail + Notes management with Tiptap
+5. Implement Work Day detail + Notes management with Lexical
 6. Implement Tasks and Projects views
-7. Implement Knowledge Base — topic tree, topic notes with Tiptap
+7. Implement Knowledge Base — topic tree, topic notes with Lexical
 8. Implement Global Tags management and tagging UI
 9. Implement global search bar (`Ctrl+K`) with faceted filters
 10. Implement Persona features: Onboarding Wizard, Dark Mode toggle, Quick Capture FAB
@@ -603,17 +570,17 @@ React 18+ SPA created via **Vite** (`npm create vite@latest`), TypeScript, style
 ### Automated Tests
 - **Unit tests** for entity computed properties (xUnit):
   ```
-  dotnet test tests/DailyNotes.Api.Tests
+  dotnet test src/DailyNotes.Api.Tests
   ```
 - **Integration tests** using `WebApplicationFactory` + in-memory or test Postgres container
 - **Angular tests**:
   ```
-  cd src/daily-notes-ui && ng test --watch=false
+  cd src/daily-notes-ui && npm test --watch=false
   ```
 
 ### Manual Verification
 1. Run `dotnet run --project src/DailyNotes.Api` and verify Swagger UI at `https://localhost:5001/swagger`
-2. Run `cd src/daily-notes-ui && ng serve` and verify the dashboard loads at `http://localhost:4200`
+2. Run `cd src/daily-notes-ui && npm run dev` and verify the dashboard loads at `http://localhost:5173`
 3. Create a work day, add notes, verify time calculations match the FileMaker formulas
 4. CRUD operations on Tasks and Projects
 5. Run CSV import against test data, verify record counts match FileMaker (Projects: 27, Tasks: 509, Notes: 54,436, Work Days: 5,853, Pay Periods: 554)
@@ -634,7 +601,7 @@ This plan aims to make the "DailyNotes" project easy to build and run on Windows
 ### Root Directory
 
 #### [NEW] [.devcontainer/devcontainer.json](./.devcontainer/devcontainer.json)
-- Configures a Dev Container using the official .NET 8 image.
+- Configures a Dev Container using the official .NET 10 image.
 - Installs necessary VS Code extensions (C#, Docker).
 - Sets up port forwarding and environment variables.
 
