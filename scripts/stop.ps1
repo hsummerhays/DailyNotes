@@ -17,9 +17,12 @@ if ($dotnetTasks) {
 }
 
 # Stop node processes related to vite/frontend
-$nodeTasks = Get-Process -Name "node" -ErrorAction SilentlyContinue | Where-Object { $_.MainModule.FileName -like "*node*" }
-# Note: It's hard to be surgical with node processes without PIDs, 
-# but we can look for specific command lines if needed.
-# For now, let's just focus on the API and telling the user.
+Write-Host "Stopping node/vite processes..."
+$nodeTasks = Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" | Where-Object { $_.CommandLine -like "*vite*" -or $_.CommandLine -like "*daily-notes-ui*" }
+if ($nodeTasks) {
+    foreach ($task in $nodeTasks) {
+        Stop-Process -Id $task.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+}
 
 Write-Host "Done. Services have been stopped."

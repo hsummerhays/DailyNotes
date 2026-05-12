@@ -12,35 +12,41 @@ erDiagram
 
 ---
 
-## Proposed Solution Architecture
+## Solution Architecture
 
+```
 ./
 ├── DailyNotes.slnx
 ├── src/
-│   ├── DailyNotes.Api/           # .NET 10 Web API
-│   ├── DailyNotes.Api.Tests/     # xUnit integration/unit tests (under src/)
-│   ├── DailyNotes.Core/          # Entities, interfaces, DTOs
-│   ├── DailyNotes.Infrastructure/# EF Core, Postgres, cloud providers
+│   ├── DailyNotes.Api/           # .NET 10 Web API (thin controllers)
+│   ├── DailyNotes.Api.Tests/     # xUnit integration tests
+│   ├── DailyNotes.Application/   # Service interfaces + implementations, ITenantContext
+│   ├── DailyNotes.Core/          # Entities, interfaces, DTOs (no dependencies)
+│   ├── DailyNotes.Infrastructure/# EF Core, Postgres, provider stubs
 │   ├── DailyNotes.Import/        # CSV import console tool
-│   └── daily-notes-ui/           # React + Vite + TypeScript SPA
+│   └── daily-notes-ui/           # React 19 + Vite + TypeScript SPA
 ├── docs/                         # Project documentation
 ├── scripts/                      # Helper scripts (init, build, run)
-├── dataImport/                   # Sample data for import
 ├── Dockerfile                    # Multi-stage build (API + UI)
 ├── docker-compose.yml            # Local dev: API + Postgres + UI
 └── .github/workflows/ci.yml      # GitHub Actions CI/CD
+```
+
+**Dependency chain (no circular references):**
+
+```
+Core  ←  Infrastructure  ←  Application  ←  Api
+```
 
 ---
 
-## Proposed Changes
+## 1. Core Domain Layer
 
-### 1. Core Domain Layer
-
-#### [NEW] [DailyNotes.Core](./src/DailyNotes.Core)
+### [DailyNotes.Core](./src/DailyNotes.Core)
 
 Class library containing entities, DTOs, and interfaces — no external dependencies.
 
-**Entities** (C# PascalCase) mapped from FileMaker tables:
+**Entities** (C# PascalCase) mapped to the PostgreSQL schema:
 
 | Entity | Key Fields |
 |---|---|
@@ -48,54 +54,63 @@ Class library containing entities, DTOs, and interfaces — no external dependen
 | `TenantUser` | TenantId, UserId, Role (Owner/Member) |
 | `Project` | Id, TenantId, UserId, **Visibility**, Name, Category, CreatedDate, CompletedDate |
 | `WorkTask` | Id, TenantId, UserId, **Visibility**, ProjectId, Name, StartDate, DueDate, CompletedDate, ExternalSource, ExternalId |
-| `WorkNote` | Id, TenantId, UserId, **Visibility**, WorkTaskId, NoteDate, Content, TimeMinutes, ExternalSource, ExternalId |
-| `WorkDay` | Id, TenantId, UserId, WorkDate, TimeIn1/Out1–3, BreakMinutes, Comments |
-| `PayPeriod` | Id, TenantId, PeriodEndDate |
+| `WorkNote` | Id, TenantId, UserId, **Visibility**, WorkTaskId, NoteDate, Content (JSONB), TimeMinutes, ExternalSource, ExternalId |
+| `WorkDay` | Id, TenantId, UserId, WorkDate, TimeIn1/Out1–3, BreakMinutes, Comments, HoursWorked (computed) |
+| `PayPeriod` | Id, TenantId, UserId, PeriodStartDate, PeriodEndDate, Holidays, PtoReported |
 | `SharedItem` | Id, ItemType, ItemId, SharedWithUserId, Permission |
 | `Attachment` | Id, TenantId, UserId, ItemType, ItemId, FileName, ContentType, StoragePath, Source |
 | `Topic` | Id, TenantId, UserId, **Visibility**, ParentTopicId, Title, Description, SkillLevel |
-| `TopicNote` | Id, TenantId, UserId, **Visibility**, TopicId, Title, Content, TimeMinutes |
-| `TopicTag` | Id, TenantId, Name |
+| `TopicNote` | Id, TenantId, UserId, **Visibility**, TopicId, Title, Content (JSONB), TimeMinutes |
+| `Tag` | Id, TenantId, Name, Color |
+| `ItemTag` | TagId, ItemType, ItemId (composite PK) |
 | `Quiz` | Id, TenantId, TopicId, Title, Difficulty (1–5) |
-| `QuizQuestion` | Id, QuizId, QuestionText, Explanation |
+| `QuizQuestion` | Id, QuizId, QuestionText, Explanation, SortOrder |
 | `QuizOption` | Id, QuestionId, OptionText, IsCorrect, SortOrder |
-| `QuizAttempt` | Id, QuizId, UserId, Score, CompletedAt |
-| `QuizAnswer` | AttemptId, QuestionId, SelectedOptionId, IsCorrect |
+| `QuizAttempt` | Id, QuizId, UserId, Score, StartedAt, CompletedAt |
+| `QuizAnswer` | AttemptId, QuestionId, SelectedOptionId, IsCorrect (composite PK) |
 | `Course` | Id, TenantId, UserId, Name, Instructor, Semester, Credits, ExternalSource, ExternalId, ProgressPercent, TopicId |
-| `Assignment` | Id, CourseId, TenantId, UserId, Title, DueDate, Grade, Weight |
+| `Assignment` | Id, CourseId, TenantId, UserId, Title, DueDate, Grade, Weight, Status |
+
+**Interfaces:**
+
+| Interface | Purpose |
+|---|---|
+| `IHasTenant` | Entities scoped to a tenant (`TenantId`) |
+| `IHasTenantUser` | Extends `IHasTenant`; also scoped to a user (`UserId`) |
+| `IAuthService` | Register / Login / RefreshToken |
+| `IEmailProvider` | SendEmailAsync, SendEmailWithAttachmentAsync |
+| `IFileStorageProvider` | UploadFileAsync, DownloadFileAsync, DeleteFileAsync |
+| `IAiVisionProvider` | AnalyzeImageAsync, ExtractTextAsync |
+| `ISpeechProvider` | TranscribeAudioAsync, SynthesizeSpeechAsync |
 
 **Skill levels** (1–5): `Beginner` → `Novice` → `Intermediate` → `Advanced` → `Expert`
 
-**Visibility** enum: `Private` (default) → `Tenant` (all tenant members) → `Custom` (specific users via `shared_items`)
-
-**Calculated properties** (formerly FileMaker calcs) become:
-- C# computed properties on entities (e.g., `WorkDay.TotalMinutes`, `WorkDay.TotalHours`, `WorkTask.IsOverdue`)
-- API-level aggregate queries (e.g., `WorkTask.TotalHours` = sum of related `WorkNote.TimeMinutes`)
-
-**External integration fields** on `WorkTask` and `WorkNote`:
-- `ExternalSource` — e.g. `"jira"`, `"salesforce"`, `"gitlab"` (nullable)
-- `ExternalId` — ticket/case ID in the external system (nullable)
-- Enables two-way sync and linking without coupling to any specific vendor
+**Visibility** values: `private` (default) → `tenant` (all tenant members) → `custom` (specific users via `shared_items`)
 
 ---
 
-### 2. Infrastructure Layer
+## 2. Infrastructure Layer
 
-#### [NEW] [DailyNotes.Infrastructure](./src/DailyNotes.Infrastructure)
+### [DailyNotes.Infrastructure](./src/DailyNotes.Infrastructure)
 
 - **EF Core 10** with `Npgsql` provider
 - `DailyNotesDbContext` with entity configurations (extends `IdentityDbContext`)
 - **ASP.NET Core Identity** user/role tables stored in the same Postgres database
-- Repository pattern (or direct DbContext usage)
 - Database migrations via `dotnet ef`
-- **Cloud abstraction interfaces** in `DailyNotes.Core`:
-  - `IFileStorageProvider` — Azure Blob / S3 / Cloud Storage
-  - `IEmailProvider` — SendGrid / SES / SMTP
-  - `IAiVisionProvider` — Azure AI Vision / Rekognition / Cloud Vision
-  - `ISpeechProvider` — Azure Speech / Transcribe / Speech-to-Text
-  - Implementations selected via `appsettings.json` cloud provider config
 
-**PostgreSQL Schema** — multi-tenant foundation baked in:
+**Provider implementations:**
+
+| Class | Interface | Status |
+|---|---|---|
+| `AuthService` | `IAuthService` | Implemented |
+| `NullEmailProvider` | `IEmailProvider` | Stub — no-op |
+| `NullFileStorageProvider` | `IFileStorageProvider` | Stub — no-op |
+| `NullAiVisionProvider` | `IAiVisionProvider` | Stub — no-op |
+| `NullSpeechProvider` | `ISpeechProvider` | Stub — no-op |
+
+Replace stubs with real implementations (Azure, SendGrid, etc.) by registering them in `Program.cs` without changing any service code.
+
+**PostgreSQL Schema:**
 
 ```sql
 -- Identity tables auto-created by EF Core Identity
@@ -109,19 +124,11 @@ CREATE TABLE tenants (
 CREATE TABLE tenant_users (
     tenant_id   INT NOT NULL REFERENCES tenants(id),
     user_id     TEXT NOT NULL,  -- FK to asp_net_users.id
-    role        VARCHAR(50) NOT NULL DEFAULT 'member',  -- 'owner' | 'member' | 'teacher' | 'student' | 'parent'
-    preferences JSONB DEFAULT '{}',                     -- { "theme": "dark", "dashboard": ["tasks", "calendar"], "onboarding_completed": true }
+    role        VARCHAR(50) NOT NULL DEFAULT 'member',
+    preferences JSONB DEFAULT '{}',
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (tenant_id, user_id)
 );
-
--- All shareable tables include: tenant_id, user_id, visibility, created_at, updated_at
--- visibility: 'private' (default) | 'tenant' | 'custom'
-
--- All mutable tables also include sync columns:
---   sync_version    BIGINT NOT NULL DEFAULT 0   (increments on every change)
---   is_deleted      BOOLEAN NOT NULL DEFAULT FALSE (soft delete for sync)
---   device_id       VARCHAR(100)                 (originating device)
 
 CREATE TABLE projects (
     id              SERIAL PRIMARY KEY,
@@ -136,18 +143,17 @@ CREATE TABLE projects (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX ix_projects_tenant_id ON projects(tenant_id);
--- (work_tasks, work_notes follow same pattern with visibility column)
--- (work_days, pay_periods: tenant_id + user_id only, no sharing)
+
+-- work_tasks and work_notes follow same pattern with visibility column
 -- work_tasks and work_notes also include:
 --   external_source VARCHAR(50),  -- 'jira' | 'salesforce' | 'gitlab' | etc.
---   external_id    VARCHAR(255),   -- ticket/case ID in external system
+--   external_id    VARCHAR(255),
 --   is_pinned      BOOLEAN NOT NULL DEFAULT FALSE
 
--- Per-tenant integration credentials
 CREATE TABLE integration_connections (
     id              SERIAL PRIMARY KEY,
     tenant_id       INT NOT NULL REFERENCES tenants(id),
-    provider        VARCHAR(50) NOT NULL,   -- 'jira' | 'salesforce' | 'slack' | 'teams' | 'zoom' | etc.
+    provider        VARCHAR(50) NOT NULL,
     base_url        VARCHAR(500),
     encrypted_credentials TEXT,
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
@@ -156,74 +162,69 @@ CREATE TABLE integration_connections (
     CONSTRAINT uq_integration_tenant_provider UNIQUE (tenant_id, provider)
 );
 
--- Inbound webhook event log
 CREATE TABLE webhook_events (
     id              SERIAL PRIMARY KEY,
     tenant_id       INT NOT NULL REFERENCES tenants(id),
     provider        VARCHAR(50) NOT NULL,
-    event_type      VARCHAR(100) NOT NULL,  -- 'meeting.ended' | 'message.created' | etc.
+    event_type      VARCHAR(100) NOT NULL,
     payload         JSONB NOT NULL,
     processed       BOOLEAN NOT NULL DEFAULT FALSE,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Integration API: per-tenant API keys for third-party access
 CREATE TABLE api_keys (
     id              SERIAL PRIMARY KEY,
     tenant_id       INT NOT NULL REFERENCES tenants(id),
     user_id         TEXT NOT NULL,
     name            VARCHAR(255) NOT NULL,
     key_hash        TEXT NOT NULL,
-    scopes          TEXT[] NOT NULL,       -- ['read:notes', 'write:tasks', 'read:topics']
+    scopes          TEXT[] NOT NULL,
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
     last_used_at    TIMESTAMPTZ,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Outbound webhook subscriptions
 CREATE TABLE webhook_subscriptions (
     id              SERIAL PRIMARY KEY,
     tenant_id       INT NOT NULL REFERENCES tenants(id),
     url             TEXT NOT NULL,
-    events          TEXT[] NOT NULL,       -- ['note.created', 'task.completed']
-    secret          TEXT NOT NULL,          -- HMAC signing secret
+    events          TEXT[] NOT NULL,
+    secret          TEXT NOT NULL,
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- User-level sharing for items with visibility = 'custom'
 CREATE TABLE shared_items (
     id                  SERIAL PRIMARY KEY,
-    item_type           VARCHAR(50) NOT NULL,  -- 'project' | 'work_task' | 'work_note'
+    item_type           VARCHAR(50) NOT NULL,
     item_id             INT NOT NULL,
-    shared_with_user_id TEXT NOT NULL,          -- FK to asp_net_users.id
-    permission          VARCHAR(20) NOT NULL DEFAULT 'read',  -- 'read' | 'write'
+    shared_with_user_id TEXT NOT NULL,
+    permission          VARCHAR(20) NOT NULL DEFAULT 'read',
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX ix_shared_items_lookup ON shared_items(item_type, item_id);
 CREATE INDEX ix_shared_items_user ON shared_items(shared_with_user_id);
 
--- File attachments and cloud document links
 CREATE TABLE attachments (
     id              SERIAL PRIMARY KEY,
     tenant_id       INT NOT NULL REFERENCES tenants(id),
     user_id         TEXT NOT NULL,
-    item_type       VARCHAR(50) NOT NULL,   -- 'work_note' | 'work_task' | 'project'
+    item_type       VARCHAR(50) NOT NULL,
     item_id         INT NOT NULL,
     file_name       VARCHAR(500) NOT NULL,
     content_type    VARCHAR(100) NOT NULL,
-    storage_path    TEXT NOT NULL,           -- blob path or external URL
+    storage_path    TEXT NOT NULL,
     file_size_bytes BIGINT,
-    source          VARCHAR(50) NOT NULL DEFAULT 'upload', -- 'upload' | 'google_drive' | 'onedrive'
-    external_url    TEXT,                    -- for cloud-linked docs
-    ocr_text        TEXT,                    -- extracted text from handwritten/image attachments
-    transcription   TEXT,                    -- speech-to-text result for audio/video
-    duration_seconds INT,                    -- audio/video duration
+    source          VARCHAR(50) NOT NULL DEFAULT 'upload',
+    external_url    TEXT,
+    ocr_text        TEXT,
+    transcription   TEXT,
+    duration_seconds INT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX ix_attachments_item ON attachments(item_type, item_id);
 
--- Full-text search vectors (auto-maintained by Postgres)
+-- Full-text search vectors (target state — not yet applied via migration)
 ALTER TABLE work_notes ADD COLUMN search_vector tsvector
   GENERATED ALWAYS AS (to_tsvector('english', coalesce(content::text, ''))) STORED;
 ALTER TABLE work_tasks ADD COLUMN search_vector tsvector
@@ -232,17 +233,12 @@ ALTER TABLE topics ADD COLUMN search_vector tsvector
   GENERATED ALWAYS AS (to_tsvector('english', coalesce(title, '') || ' ' || coalesce(description, ''))) STORED;
 ALTER TABLE topic_notes ADD COLUMN search_vector tsvector
   GENERATED ALWAYS AS (to_tsvector('english', coalesce(title, '') || ' ' || coalesce(content::text, ''))) STORED;
-ALTER TABLE attachments ADD COLUMN search_vector tsvector
-  GENERATED ALWAYS AS (to_tsvector('english', coalesce(ocr_text, '') || ' ' || coalesce(transcription, ''))) STORED;
 
 CREATE INDEX ix_work_notes_search ON work_notes USING GIN(search_vector);
 CREATE INDEX ix_work_tasks_search ON work_tasks USING GIN(search_vector);
 CREATE INDEX ix_topics_search ON topics USING GIN(search_vector);
 CREATE INDEX ix_topic_notes_search ON topic_notes USING GIN(search_vector);
-CREATE INDEX ix_attachments_search ON attachments USING GIN(search_vector);
 
--- Knowledge Base
--- Global Tags
 CREATE TABLE tags (
     id          SERIAL PRIMARY KEY,
     tenant_id   INT NOT NULL REFERENCES tenants(id),
@@ -259,8 +255,8 @@ CREATE TABLE topics (
     parent_topic_id     INT REFERENCES topics(id) ON DELETE SET NULL,
     title               VARCHAR(255) NOT NULL,
     description         TEXT,
-    proficiency         VARCHAR(20) DEFAULT 'learning', -- 'beginner' | 'novice' | 'intermediate' | 'advanced' | 'expert'
-    skill_level         SMALLINT NOT NULL DEFAULT 1,     -- 1-5 numeric for quiz difficulty matching
+    proficiency         VARCHAR(20) DEFAULT 'learning',
+    skill_level         SMALLINT NOT NULL DEFAULT 1,
     is_pinned           BOOLEAN NOT NULL DEFAULT FALSE,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -275,31 +271,28 @@ CREATE TABLE topic_notes (
     visibility      VARCHAR(20) NOT NULL DEFAULT 'private',
     topic_id        INT NOT NULL REFERENCES topics(id),
     title           VARCHAR(255),
-    content         JSONB,              -- Tiptap JSON (same as work notes)
-    time_minutes    INT DEFAULT 0,      -- study time tracking
+    content         JSONB,
+    time_minutes    INT DEFAULT 0,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX ix_topic_notes_topic_id ON topic_notes(topic_id);
 
--- Many-to-many: notes ↔ tags
--- Polymorphic tagging (Entity Tags)
 CREATE TABLE item_tags (
     tag_id      INT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
-    item_type   VARCHAR(50) NOT NULL, -- 'note', 'task', 'topic', 'course'
+    item_type   VARCHAR(50) NOT NULL,
     item_id     INT NOT NULL,
     tenant_id   INT NOT NULL REFERENCES tenants(id),
     PRIMARY KEY (tag_id, item_type, item_id)
 );
 CREATE INDEX ix_item_tags_lookup ON item_tags(item_type, item_id);
 
--- Quiz system
 CREATE TABLE quizzes (
     id          SERIAL PRIMARY KEY,
     tenant_id   INT NOT NULL REFERENCES tenants(id),
     topic_id    INT NOT NULL REFERENCES topics(id),
     title       VARCHAR(255) NOT NULL,
-    difficulty  SMALLINT NOT NULL DEFAULT 1, -- 1-5 maps to skill levels
+    difficulty  SMALLINT NOT NULL DEFAULT 1,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -329,28 +322,27 @@ CREATE TABLE quiz_attempts (
 );
 
 CREATE TABLE quiz_answers (
-    attempt_id      INT NOT NULL REFERENCES quiz_attempts(id) ON DELETE CASCADE,
-    question_id     INT NOT NULL REFERENCES quiz_questions(id),
-    selected_option_id INT REFERENCES quiz_options(id),
-    is_correct      BOOLEAN NOT NULL,
+    attempt_id          INT NOT NULL REFERENCES quiz_attempts(id) ON DELETE CASCADE,
+    question_id         INT NOT NULL REFERENCES quiz_questions(id),
+    selected_option_id  INT REFERENCES quiz_options(id),
+    is_correct          BOOLEAN NOT NULL,
     PRIMARY KEY (attempt_id, question_id)
 );
 
--- Education
 CREATE TABLE courses (
     id              SERIAL PRIMARY KEY,
     tenant_id       INT NOT NULL REFERENCES tenants(id),
     user_id         TEXT NOT NULL,
     name            VARCHAR(255) NOT NULL,
     instructor      VARCHAR(255),
-    semester        VARCHAR(50),         -- 'Spring 2026', 'Fall 2025'
+    semester        VARCHAR(50),
     credits         SMALLINT,
-    current_grade   DECIMAL(5,2),        -- computed / manually entered
-    external_source VARCHAR(50),          -- 'udemy' | 'linkedin_learning' | 'coursera' | 'pluralsight'
-    external_id     VARCHAR(255),         -- platform course ID
-    external_url    TEXT,                 -- direct link to course
-    progress_percent SMALLINT DEFAULT 0,  -- 0-100, synced from platform or manual
-    topic_id        INT REFERENCES topics(id), -- link to KB topic for notes
+    current_grade   DECIMAL(5,2),
+    external_source VARCHAR(50),
+    external_id     VARCHAR(255),
+    external_url    TEXT,
+    progress_percent SMALLINT DEFAULT 0,
+    topic_id        INT REFERENCES topics(id),
     is_pinned       BOOLEAN NOT NULL DEFAULT FALSE,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -367,267 +359,177 @@ CREATE TABLE assignments (
     due_date        TIMESTAMPTZ,
     grade           DECIMAL(5,2),
     max_grade       DECIMAL(5,2) DEFAULT 100,
-    weight          DECIMAL(5,2),        -- percentage weight in final grade
-    status          VARCHAR(20) NOT NULL DEFAULT 'pending', -- 'pending' | 'submitted' | 'graded'
-    topic_id        INT REFERENCES topics(id), -- optional link to KB topic
+    weight          DECIMAL(5,2),
+    status          VARCHAR(20) NOT NULL DEFAULT 'pending',
+    topic_id        INT REFERENCES topics(id),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX ix_assignments_course_id ON assignments(course_id);
 ```
 
-**Visibility logic** via EF Core query filters + service layer:
+---
+
+## 3. Application Layer
+
+### [DailyNotes.Application](./src/DailyNotes.Application)
+
+Contains all use-case logic. Services inherit `ApplicationServiceBase` which provides:
+- `DailyNotesDbContext _db` — direct EF Core access
+- `ITenantContext _tc` — current user/tenant for the request
+- `TenantScoped<T>(query)` — adds `WHERE TenantId = x AND UserId = y` (for `IHasTenantUser` entities)
+- `TenantOnlyScoped<T>(query)` — adds `WHERE TenantId = x` (for `IHasTenant` entities: `Tag`, `Quiz`)
+
+**Service interfaces:**
+
+| Interface | Domain |
+|---|---|
+| `IWorkDayService` | Work day CRUD + today lookup |
+| `IWorkNoteService` | Work note CRUD; `CreateAsync` ensures the linked WorkDay exists (wrapped in transaction) |
+| `IWorkTaskService` | Work task CRUD + overdue query |
+| `IProjectService` | Project CRUD + project tasks query |
+| `ICourseService` | Course CRUD (with Assignments include) |
+| `ITopicService` | Topic CRUD + children + notes for topic |
+| `ITopicNoteService` | Topic note CRUD + tag filtering |
+| `ITagService` | Tag CRUD + polymorphic tag/untag operations |
+| `IAssignmentService` | Assignment CRUD |
+| `IAttachmentService` | Attachment CRUD (metadata only) |
+| `IPayPeriodService` | Pay period CRUD + work days for period |
+| `IQuizService` | Quiz CRUD + add question/option |
+| `IQuizAttemptService` | Attempt history, detail, submit (scoring wrapped in transaction) |
+| `ISearchService` | Cross-entity search (notes, tasks, topics) |
+
+**`ITenantContext`** is defined here and implemented in the Api layer as `HttpTenantContext` (reads JWT claims via `IHttpContextAccessor`).
+
+**DTOs** in `DailyNotes.Application.DTOs`:
+- `QuizDetailDto` — quiz + questions + options
+- `QuizAttemptDetailDto` — attempt + answers
+- `QuizSubmissionDto` / `QuizAnswerDto` — submit payload
+
+---
+
+## 4. API Layer
+
+### [DailyNotes.Api](./src/DailyNotes.Api)
+
+.NET 10 Web API with thin controllers. Each controller injects one service interface; action methods are typically 1–3 lines.
+
+**`HttpTenantContext`** (`Api/Infrastructure/HttpTenantContext.cs`) — implements `ITenantContext` by reading `ClaimTypes.NameIdentifier` (or `sub`) and `tenant_id` claims from the JWT via `IHttpContextAccessor`. Registered as `Scoped`.
+
+**`ApiControllerBase`** provides `CurrentUserId` and `CurrentTenantId` properties for the rare case a controller action needs direct claim access (e.g., `AuthController`).
+
+**Endpoints:**
+
+| Resource | Endpoints |
+|---|---|
+| **Auth** | `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/logout` |
+| **WorkDays** | `GET /api/work-days?date=&from=&to=&all=`, `GET /api/work-days/today`, `GET /{id}`, `POST`, `PUT /{id}`, `DELETE /{id}` |
+| **WorkNotes** | `GET /api/work-notes?date=&taskId=&page=&pageSize=`, `GET /{id}`, `POST`, `PUT /{id}`, `DELETE /{id}` |
+| **WorkTasks** | `GET /api/work-tasks?status=&projectId=`, `GET /overdue`, `GET /{id}`, `POST`, `PUT /{id}`, `DELETE /{id}` |
+| **Projects** | Full CRUD + `GET /{id}/tasks` |
+| **Courses** | Full CRUD (`?semester=`) + includes Assignments on `GET /{id}` |
+| **Assignments** | Full CRUD (`?courseId=&status=&dueDate=`) |
+| **Topics** | Full CRUD (`?parentId=&all=`) + `GET /{id}/children` + `GET /{id}/notes` |
+| **TopicNotes** | Full CRUD (`?topicId=&tagId=`) |
+| **Tags** | Full CRUD + `POST /{tagId}/items`, `DELETE /{tagId}/items/{itemType}/{itemId}`, `GET /{tagId}/items` |
+| **Attachments** | `GET /api/attachments?itemType=&itemId=`, `GET /{id}`, `POST`, `DELETE /{id}` |
+| **PayPeriods** | Full CRUD (`?date=`) + `GET /{id}/work-days` |
+| **Quizzes** | Full CRUD (`?topicId=&difficulty=`) + `POST /{quizId}/questions` + `POST /questions/{questionId}/options` |
+| **QuizAttempts** | `GET /api/quiz-attempts?quizId=`, `GET /{id}`, `POST` (submit) |
+| **Search** | `GET /api/search?q=&type=&dateFrom=&dateTo=&projectId=&statuses=` |
+
+All endpoints except `/api/auth/*` require `[Authorize]` with a valid JWT Bearer token.
+
+**Cross-cutting configuration** (`Program.cs`):
+- CORS for `localhost:5173` (Vite) and `localhost:4200`
+- JWT Bearer authentication + refresh token rotation
+- Rate limiting on auth endpoints (10 req/min)
+- Swagger/OpenAPI with Bearer scheme
+- Global exception handler middleware
+- `IHttpContextAccessor` registered for `HttpTenantContext`
+
+---
+
+## 5. Authentication Flow
+
 ```csharp
-// User sees an item if:
-//   1. They own it (user_id == currentUser), OR
-//   2. visibility == 'tenant' && same tenant, OR
-//   3. visibility == 'custom' && shared_items entry exists for them
-modelBuilder.Entity<WorkNote>().HasQueryFilter(n =>
-    n.TenantId == _tenantId &&
-    (n.UserId == _userId || n.Visibility != Visibility.Private));
-```
+// ASP.NET Core Identity + JWT Bearer
 
-EF Core maps C# PascalCase entities to this schema via `Npgsql.EntityFrameworkCore.PostgreSQL` snake_case conventions.
-
-**Authentication — ASP.NET Core Identity + JWT (with Entra ID migration path):**
-
-```csharp
-// --- Current: ASP.NET Core Identity + JWT ---
-// NuGet: Microsoft.AspNetCore.Identity.EntityFrameworkCore
-//        Microsoft.AspNetCore.Authentication.JwtBearer
-
-builder.Services.AddIdentity<IdentityUser, IdentityRole>()
-    .AddEntityFrameworkStores<DailyNotesDbContext>()
-    .AddDefaultTokenProviders();
+builder.Services.AddIdentityCore<IdentityUser>()
+    .AddEntityFrameworkStores<DailyNotesDbContext>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options => {
         options.TokenValidationParameters = new TokenValidationParameters {
-            ValidateIssuer = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidateAudience = true,
-            ValidAudience = builder.Configuration["Jwt:Audience"],
+            ValidateIssuer = true,   ValidIssuer   = config["Jwt:Issuer"],
+            ValidateAudience = true, ValidAudience = config["Jwt:Audience"],
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
+                Encoding.UTF8.GetBytes(config["Jwt:Key"]!))
         };
     });
 
-// --- FUTURE: Microsoft Entra ID migration ---
+// FUTURE: Microsoft Entra ID migration
 // 1. Install: Microsoft.Identity.Web
-// 2. Replace the above with:
+// 2. Replace with:
 //    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 //        .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
-// 3. Add to appsettings.json:
-//    "AzureAd": {
-//      "Instance": "https://login.microsoftonline.com/",
-//      "TenantId": "<your-tenant-id>",
-//      "ClientId": "<your-client-id>"
-//    }
-// 4. In Angular, replace JWT auth service with @azure/msal-angular
-// 5. Enable Easy Auth on Azure App Service as fallback
+// 3. appsettings.json: "AzureAd": { "TenantId": "...", "ClientId": "..." }
 ```
 
+**Token claims:** `sub` (UserId), `email`, `jti`, `tenant_id`, `role`  
+**Access token:** 1-hour JWT, HMAC-SHA256  
+**Refresh token:** 64-byte random, stored in `asp_net_user_tokens` table, rotated on every refresh  
+**Refresh cookie:** httpOnly, Secure (production), SameSite=Strict
+
 ---
 
-### 3. API Layer
+## 6. React Frontend
 
-#### [NEW] [DailyNotes.Api](./src/DailyNotes.Api)
+### [daily-notes-ui](./src/daily-notes-ui)
 
-.NET 10 Minimal API or Controllers exposing RESTful endpoints:
+React 19 SPA built with Vite, TypeScript, and Tailwind CSS 4.
 
-| Resource | Endpoints |
+| Layer | Library |
 |---|---|
-| **Auth** | `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/refresh` |
-| **WorkDays** | `GET /api/work-days?date=`, `GET /api/work-days/today`, `POST`, `PUT`, `DELETE` |
-| **WorkTasks** | Full CRUD + `GET /api/work-tasks?status=in-progress\|overdue\|completed\|unscheduled` |
-| **WorkNotes** | CRUD + `GET /api/work-notes?date=&taskId=` |
-| **Projects** | Full CRUD + `GET /api/projects/{id}/tasks` |
-| **PayPeriods** | `GET /api/pay-periods?date=` with computed totals |
-| **Attachments** | `POST /api/attachments` (multipart upload), `GET`, `DELETE` |
-| **Topics** | Full CRUD + `GET /api/topics?parentId=` (hierarchical), `GET /api/topics/{id}/notes` |
-| **TopicNotes** | Full CRUD + `GET /api/topic-notes?tagId=` |
-| **TopicTags** | CRUD + `GET /api/topic-tags` |
-| **Quizzes** | CRUD + `GET /api/quizzes?topicId=&difficulty=` |
-| **QuizAttempts** | `POST /api/quiz-attempts` (submit), `GET /api/quiz-attempts?quizId=` (history) |
-| **Courses** | Full CRUD + `GET /api/courses?semester=` |
-| **Assignments** | Full CRUD + `GET /api/assignments?courseId=&status=&dueDate=` |
-| **Search** | `GET /api/search?q=&type=all\|notes\|tasks\|topics&dateFrom=&dateTo=&tags=` |
-| **Sync** | `POST /api/sync` — send local changes + last sync version, receive server changes + conflicts |
+| Framework | React 19 + TypeScript |
+| Build | Vite 7 |
+| Routing | React Router 7 |
+| Server state | TanStack Query 5 |
+| Client state | Zustand 5 |
+| Rich text editor | Lexical 0.41 (content stored as JSONB) |
+| HTTP client | Axios (JWT interceptor + auto-refresh) |
+| Styling | Tailwind CSS 4 |
+| Icons | Lucide React |
 
-All endpoints except Auth require `[Authorize]` with a valid JWT Bearer token **or** a scoped API key.
-
-**Authentication modes:**
-- **JWT Bearer** — for Angular frontend and interactive sessions
-- **API Key** — `X-Api-Key` header for third-party integrations (scoped permissions)
-
-**Cross-cutting configuration:**
-- CORS configured for Angular dev server (`localhost:4200`)
-- Swagger/OpenAPI for API documentation
-- Global error handling middleware
-- `appsettings.json` with Postgres connection string
+**Core modules:** Dashboard, Work Days, Tasks, Projects, Notes, Knowledge Base (topics/quizzes), Education (courses/assignments), Global Search, Pay Periods.
 
 ---
 
-### 4. React Frontend + Tailwind CSS
+## 7. Tests
 
-#### [NEW] [daily-notes-ui](./src/daily-notes-ui)
+### [DailyNotes.Api.Tests](./src/DailyNotes.Api.Tests)
 
-React 18+ SPA created via **Vite** (`npm create vite@latest`), TypeScript, styled with **Tailwind CSS**.
+Integration tests using `WebApplicationFactory<Program>` with an InMemory database.
 
-**PWA (Progressive Web App):**
-- `vite-plugin-pwa` — Service Worker for offline caching
-- `manifest.webmanifest` — installable on iOS, Android, Windows, macOS
-- **IndexedDB** (via Dexie.js) — local offline database for all entities
-- **Sync queue** — pending changes replayed when connectivity restored
-
-**Styling & Libraries:**
-- Tailwind CSS 3 for utility-first styling
-- **shadcn/ui + Radix UI** — accessible, beautiful component library
-- **Lexical** (`lexical`) — extensible text editor framework for notes, styled with Tailwind
-  - Note content stored as **JSON** in Postgres (`content JSONB`), rendered client-side
-  - AI-ready extension model for future MCP autocompletion/summarization
-- Custom color palette and design tokens in `tailwind.config.js`
-- Responsive layouts via Tailwind breakpoints (`sm`: phone, `md`: tablet, `lg`: laptop, `xl`: desktop)
-- **Mobile-first design:** bottom navigation on small screens, collapsible sidebar on medium, persistent sidebar on large
-- **Document handling:** drag-and-drop files into Lexical, `.docx` import via Mammoth.js, `.xlsx` preview via SheetJS
-- **Voice recording:** `MediaRecorder` API in Lexical toolbar — record, upload, embed inline audio player
-- **Drawing canvas:** `perfect-freehand` library for pressure-sensitive stylus input (iPad, Surface, Samsung, Wacom) — export as SVG/PNG
-
-**State Management:**
-- **React Query (TanStack Query)** — server state, caching, background sync
-- **Zustand** — lightweight client state (auth, UI preferences)
-- **React Router** — client-side routing
-
-**Core Modules/Features:**
-
-| Feature | Description |
-|---|---|
-| **Dashboard** | Today's work day — time in/out, breaks, notes list, task summary |
-| **Work Days** | List/detail views with calendar navigation, monthly view |
-| **Tasks** | List (filterable by status), detail with linked notes |
-| **Projects** | List with nested tasks, total days/hours |
-| **Notes** | Lexical rich text editor for add/edit, inline from work day or standalone |
-| **Knowledge Base** | Topic tree, notes, tags, quizzes (create/take), skill progress dashboard |
-| **Education** | Course list, assignment tracker with due dates, grade overview |
-| **Search** | Global search bar (`Ctrl+K`), faceted filters (type, date, tags, status), highlighted results |
-| **Pay Periods** | Period list with hour/day summaries |
-
-**React Hooks & Services:**
-- `useAuth()` — login, register, token storage/refresh
-- Axios interceptor — attaches JWT Bearer token to API requests
-- `ProtectedRoute` — route guard redirecting unauthenticated users to login
-- `useWorkDays()`, `useTasks()`, `useNotes()`, `useProjects()`, `usePayPeriods()`
-- `useAttachments()` — file upload, download, delete
-- `useSearch()` — global search with debounced queries
-- API client auto-generated from OpenAPI spec via `openapi-typescript-codegen`
+- `CustomWebApplicationFactory` — swaps Postgres for InMemory DB; replaces JWT auth with `TestAuthHandler` that reads `X-User-Id` and `X-Tenant-Id` request headers as claims.
+- 18 tests across 11 controller test classes.
+- Run: `dotnet test`
 
 ---
 
-## Implementation Phases
+## 8. Cross-Platform Development
 
-### Phase 1 — Backend Foundation
-1. Create solution and project structure
-2. Define entities in `DailyNotes.Core`
-3. Define cloud abstraction interfaces (`IFileStorageProvider`, `IEmailProvider`, etc.)
-4. Set up EF Core + Identity + Postgres in `DailyNotes.Infrastructure`
-5. Run initial migrations (includes Identity tables)
-6. Build Auth endpoints (register/login/refresh)
-7. Build API endpoints for Work Days, Notes, Tasks, Projects
-8. Add `Dockerfile` + `docker-compose.yml` for local dev (API + Postgres)
+The project includes a `.devcontainer/` configuration (VS Code Dev Container using .NET 10 image) and `scripts/` with both `.sh` and `.ps1` versions of `init`, `build`, and `run` scripts.
 
-### Phase 2 — React Frontend
-1. Scaffold React app with Vite + TypeScript + Tailwind CSS + shadcn/ui
-2. Implement login/register pages + `useAuth()` hook + JWT interceptor
-3. Auto-generate typed API client from OpenAPI spec
-4. Implement Dashboard (today's work day view)
-5. Implement Work Day detail + Notes management with Lexical
-6. Implement Tasks and Projects views
-7. Implement Knowledge Base — topic tree, topic notes with Lexical
-8. Implement Global Tags management and tagging UI
-9. Implement global search bar (`Ctrl+K`) with faceted filters
-10. Implement Persona features: Onboarding Wizard, Dark Mode toggle, Quick Capture FAB
-11. Add PWA manifest + Service Worker, IndexedDB offline caching via Dexie.js
+```powershell
+# Start only the database
+docker-compose up -d postgres
 
-### Phase 3 — Data Import & Polish
-1. Build `DailyNotes.Import` console tool:
-   - Reads CSV files exported from FileMaker
-   - Creates a default tenant, assigns imported data to it
-   - Inserts in dependency order: Projects → Tasks → Work Days → Notes → Pay Periods
-   - Uses `CsvHelper` NuGet for parsing
-   - Run via: `dotnet run --project src/DailyNotes.Import -- --csv-dir ./data`
-2. Pay Period view with computed summaries
-3. Search / filter / reporting
-4. "Send note as email" — outbound via SMTP / SendGrid
-5. Outbound notifications to Slack / Teams channels (task completed, daily digest)
-6. Webhook dispatch on CRUD events (fires `webhook_subscriptions`)
-7. Offline sync queue + conflict resolution (last-write-wins with user override)
+# Start full stack (API + Postgres)
+docker-compose up -d
 
-
-
-## Verification Plan
-
-### Automated Tests
-- **Unit tests** for entity computed properties (xUnit):
-  ```
-  dotnet test src/DailyNotes.Api.Tests
-  ```
-- **Integration tests** using `WebApplicationFactory` + in-memory or test Postgres container
-- **Angular tests**:
-  ```
-  cd src/daily-notes-ui && npm test --watch=false
-  ```
-
-### Manual Verification
-1. Run `dotnet run --project src/DailyNotes.Api` and verify Swagger UI at `https://localhost:5001/swagger`
-2. Run `cd src/daily-notes-ui && npm run dev` and verify the dashboard loads at `http://localhost:5173`
-3. Create a work day, add notes, verify time calculations match the FileMaker formulas
-4. CRUD operations on Tasks and Projects
-5. Run CSV import against test data, verify record counts match FileMaker (Projects: 27, Tasks: 509, Notes: 54,436, Work Days: 5,853, Pay Periods: 554)
-# Cross-Platform Development Support Plan
-
-This plan aims to make the "DailyNotes" project easy to build and run on Windows, Mac, and Linux by introducing Development Containers and standardizing build/run scripts.
-
-## User Review Required
-
-> [!NOTE]
-> I will be adding a `.devcontainer` configuration which requires Docker and VS Code (or GitHub Codespaces). This is the most robust way to ensure a consistent environment across platforms.
-
-> [!IMPORTANT]
-> I will create a `scripts/` directory containing both Bash (`.sh`) and PowerShell (`.ps1`) scripts for common tasks (`init`, `build`, `run`). This ensures users on any OS can run the same commands.
-
-## Proposed Changes
-
-### Root Directory
-
-#### [NEW] [.devcontainer/devcontainer.json](./.devcontainer/devcontainer.json)
-- Configures a Dev Container using the official .NET 10 image.
-- Installs necessary VS Code extensions (C#, Docker).
-- Sets up port forwarding and environment variables.
-
-#### [NEW] [README.md](./README.md)
-- detailed "Getting Started" guide for Windows, Mac, and Linux.
-- Instructions for using the new scripts and Dev Container.
-
-### Scripts Directory (`scripts/`)
-
-#### [NEW] [scripts/init.sh](./scripts/init.sh) & [scripts/init.ps1](./scripts/init.ps1)
-- Restores .NET dependencies.
-- Checks for Docker availability.
-
-#### [NEW] [scripts/build.sh](./scripts/build.sh) & [scripts/build.ps1](./scripts/build.ps1)
-- Builds the solution/project using `dotnet build`.
-
-#### [NEW] [scripts/run.sh](./scripts/run.sh) & [scripts/run.ps1](./scripts/run.ps1)
-- Wrapper around `docker-compose up` to start the database and API.
-- Alternatively, provides a mode to run locally with `dotnet run` if preferred (will default to Docker for consistency).
-
-## Verification Plan
-
-### Automated Tests
-- I will run the newly created scripts on the current environment (Windows) to verify the `.ps1` scripts work.
-- I will verify the shell scripts syntax (though I cannot execute them natively on Windows without WSL, I will ensure they follow standard POSIX/Bash best practices).
-
-### Manual Verification
-- **Windows**: Run `.\scripts\build.ps1` and verify it builds.
-- **Dev Container**: Open the project in a Dev Container (if the user is willing to test, or I can verifying the config file validity).
+# Frontend dev server
+npm install
+npm run dev
+```

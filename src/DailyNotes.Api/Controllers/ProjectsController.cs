@@ -1,8 +1,7 @@
+using DailyNotes.Application.Services;
 using DailyNotes.Core.Entities;
-using DailyNotes.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace DailyNotes.Api.Controllers
 {
@@ -11,32 +10,25 @@ namespace DailyNotes.Api.Controllers
     [Authorize]
     public class ProjectsController : ApiControllerBase
     {
-        private readonly DailyNotesDbContext _context;
+        private readonly IProjectService _service;
 
-        public ProjectsController(DailyNotesDbContext context)
+        public ProjectsController(IProjectService service)
         {
-            _context = context;
+            _service = service;
         }
 
         /// <summary>Retrieves all projects belonging to the current tenant.</summary>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Project>>> GetAll()
-        {
-            return await TenantScoped(_context.Projects)
-                .OrderByDescending(p => p.CreatedAt)
-                .ToListAsync();
-        }
+            => Ok(await _service.GetAllAsync());
 
         /// <summary>Retrieves a specific project by its ID.</summary>
         /// <param name="id">The unique ID of the project.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<Project>> GetById(int id)
         {
-            var project = await TenantScoped(_context.Projects)
-                .FirstOrDefaultAsync(p => p.Id == id);
-            if (project == null)
-                return NotFound();
-
+            var project = await _service.GetByIdAsync(id);
+            if (project == null) return NotFound();
             return project;
         }
 
@@ -45,17 +37,9 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("{id}/tasks")]
         public async Task<ActionResult<IEnumerable<WorkTask>>> GetProjectTasks(int id)
         {
-            var project = await TenantScoped(_context.Projects)
-                .FirstOrDefaultAsync(p => p.Id == id);
-            if (project == null)
-                return NotFound();
-
-            var tasks = await TenantScoped(_context.WorkTasks)
-                .Where(t => t.ProjectId == id)
-                .OrderByDescending(t => t.CreatedAt)
-                .ToListAsync();
-
-            return tasks;
+            var tasks = await _service.GetProjectTasksAsync(id);
+            if (tasks == null) return NotFound();
+            return Ok(tasks);
         }
 
         /// <summary>Creates a new project.</summary>
@@ -63,15 +47,8 @@ namespace DailyNotes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<Project>> Create(Project project)
         {
-            project.TenantId = CurrentTenantId;
-            project.UserId = CurrentUserId;
-            project.CreatedAt = DateTime.UtcNow;
-            project.UpdatedAt = DateTime.UtcNow;
-
-            _context.Projects.Add(project);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetById), new { id = project.Id }, project);
+            var created = await _service.CreateAsync(project);
+            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
         /// <summary>Updates an existing project record.</summary>
@@ -80,40 +57,14 @@ namespace DailyNotes.Api.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, Project project)
         {
-            if (id != project.Id)
-                return BadRequest(new { message = "ID mismatch." });
-
-            var existing = await TenantScoped(_context.Projects)
-                .FirstOrDefaultAsync(p => p.Id == id);
-            if (existing == null)
-                return NotFound();
-
-            existing.Name = project.Name;
-            existing.Category = project.Category;
-            existing.Visibility = project.Visibility;
-            existing.CreatedDate = project.CreatedDate;
-            existing.CompletedDate = project.CompletedDate;
-            existing.UpdatedAt = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            if (id != project.Id) return BadRequest(new { message = "ID mismatch." });
+            return await _service.UpdateAsync(id, project) ? NoContent() : NotFound();
         }
 
         /// <summary>Deletes a project and its associated metadata (tasks remain but are unlinked if handled by DB).</summary>
         /// <param name="id">The ID of the project to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
-        {
-            var project = await TenantScoped(_context.Projects)
-                .FirstOrDefaultAsync(p => p.Id == id);
-            if (project == null)
-                return NotFound();
-
-            _context.Projects.Remove(project);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
+            => await _service.DeleteAsync(id) ? NoContent() : NotFound();
     }
 }

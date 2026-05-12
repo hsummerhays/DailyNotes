@@ -6,10 +6,14 @@
         "src/daily-notes-ui"
     ],
     "scripts": {
+        "dev": "concurrently -n \"API,UI\" -c \"cyan,magenta\" \"dotnet run --project src/DailyNotes.Api/DailyNotes.Api.csproj\" \"npm run dev:ui\"",
         "dev:ui": "npm run dev -w src/daily-notes-ui",
         "build:ui": "npm run build -w src/daily-notes-ui",
         "lint:ui": "npm run lint -w src/daily-notes-ui",
         "audit:ui": "npm audit -w src/daily-notes-ui",
         "install:all": "npm install"
+    },
+    "devDependencies": {
+        "concurrently": "^9.1.2"
     }
 }

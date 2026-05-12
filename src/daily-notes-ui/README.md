@@ -1,73 +1,69 @@
-# React + TypeScript + Vite
+# DailyNotes UI
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19 + TypeScript + Vite frontend for the DailyNotes productivity platform.
 
-Currently, two official plugins are available:
+## Development
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```powershell
+# From project root
+npm install
+npm run dev        # http://localhost:5173
+npm run build
+npm run preview
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+The dev server proxies `/api` requests to the .NET API at `http://localhost:5010` (configured in `vite.config.ts`).
+
+## Stack
+
+| Layer | Library |
+|---|---|
+| Framework | React 19 + TypeScript |
+| Build | Vite 7 |
+| Routing | React Router 7 |
+| Server state | TanStack Query 5 |
+| Client state | Zustand 5 |
+| Rich text | Lexical 0.41 |
+| HTTP client | Axios |
+| Styling | Tailwind CSS 4 |
+| Icons | Lucide React |
+
+## Project structure
+
+```
+src/
+  components/     Shared UI components
+  pages/          Route-level page components
+  stores/         Zustand stores (auth, UI preferences)
+  lib/            API client, utilities, hooks
+  assets/         Static assets
+```
+
+## API client
+
+The API client in `src/lib/api.ts` uses Axios with a request interceptor that attaches the JWT Bearer token from local storage. Token refresh is handled automatically on 401 responses via the `/api/auth/refresh` endpoint (the refresh token is stored as an httpOnly cookie).
+
+## Authentication flow
+
+1. `POST /api/auth/login` → receives `{ token, expiration, tenantId, role }` + sets `refreshToken` httpOnly cookie
+2. Token stored in Zustand store + local storage
+3. On app load, if token is expired, `POST /api/auth/refresh` exchanges the cookie for a new token pair
+4. `POST /api/auth/logout` clears the cookie
+
+## ESLint
+
+To enable stricter type-checked rules, update `eslint.config.js`:
 
 ```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+import tseslint from 'typescript-eslint'
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
+export default tseslint.config({
+  extends: [tseslint.configs.recommendedTypeChecked],
+  languageOptions: {
+    parserOptions: {
+      project: ['./tsconfig.node.json', './tsconfig.app.json'],
+      tsconfigRootDir: import.meta.dirname,
     },
   },
-])
+})
 ```

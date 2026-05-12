@@ -1,8 +1,7 @@
+using DailyNotes.Application.Services;
 using DailyNotes.Core.Entities;
-using DailyNotes.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace DailyNotes.Api.Controllers
 {
@@ -11,11 +10,11 @@ namespace DailyNotes.Api.Controllers
     [Authorize]
     public class WorkDaysController : ApiControllerBase
     {
-        private readonly DailyNotesDbContext _context;
+        private readonly IWorkDayService _service;
 
-        public WorkDaysController(DailyNotesDbContext context)
+        public WorkDaysController(IWorkDayService service)
         {
-            _context = context;
+            _service = service;
         }
 
         /// <summary>Retrieves all work days, optionally filtered by date or a date range.</summary>
@@ -33,67 +32,20 @@ namespace DailyNotes.Api.Controllers
             [FromQuery] bool all = false,
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 20)
-        {
-            var query = TenantScoped(_context.WorkDays).AsQueryable();
-
-            if (all)
-            {
-                // if 'all' is true, return everything, ignore other date filters
-            }
-            else if (date.HasValue)
-            {
-                query = query.Where(w => w.WorkDate == date.Value);
-            }
-            else if (from.HasValue || to.HasValue)
-            {
-                if (from.HasValue)
-                    query = query.Where(w => w.WorkDate >= from.Value);
-                if (to.HasValue)
-                    query = query.Where(w => w.WorkDate <= to.Value);
-            }
-            else
-            {
-                // Default behavior: filter by current month
-                var now = DateOnly.FromDateTime(DateTime.UtcNow);
-                var startDate = new DateOnly(now.Year, now.Month, 1);
-                var endDate = startDate.AddMonths(1).AddDays(-1);
-                query = query.Where(w => w.WorkDate >= startDate && w.WorkDate <= endDate);
-            }
-
-            return await query
-                .OrderByDescending(w => w.WorkDate)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
-        }
+            => Ok(await _service.GetAllAsync(date, from, to, all, page, pageSize));
 
         /// <summary>Retrieves the work day record representing the current date.</summary>
         [HttpGet("today")]
         public async Task<ActionResult<WorkDay>> GetToday()
-        {
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
-            var workDay = await TenantScoped(_context.WorkDays)
-                .Include(w => w.Notes)
-                .FirstOrDefaultAsync(w => w.WorkDate == today);
-
-            if (workDay == null)
-                return Ok(null);
-
-            return workDay;
-        }
+            => Ok(await _service.GetTodayAsync());
 
         /// <summary>Retrieves a specific work day by its unique ID.</summary>
         /// <param name="id">The unique ID of the work day.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<WorkDay>> GetById(int id)
         {
-            var workDay = await TenantScoped(_context.WorkDays)
-                .Include(w => w.Notes)
-                .FirstOrDefaultAsync(w => w.Id == id);
-
-            if (workDay == null)
-                return NotFound();
-
+            var workDay = await _service.GetByIdAsync(id);
+            if (workDay == null) return NotFound();
             return workDay;
         }
 
@@ -102,15 +54,8 @@ namespace DailyNotes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<WorkDay>> Create(WorkDay workDay)
         {
-            workDay.TenantId = CurrentTenantId;
-            workDay.UserId = CurrentUserId;
-            workDay.CreatedAt = DateTime.UtcNow;
-            workDay.UpdatedAt = DateTime.UtcNow;
-
-            _context.WorkDays.Add(workDay);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetById), new { id = workDay.Id }, workDay);
+            var created = await _service.CreateAsync(workDay);
+            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
         /// <summary>Updates an existing work day record.</summary>
@@ -119,44 +64,14 @@ namespace DailyNotes.Api.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, WorkDay workDay)
         {
-            if (id != workDay.Id)
-                return BadRequest(new { message = "ID mismatch." });
-
-            var existing = await TenantScoped(_context.WorkDays)
-                .FirstOrDefaultAsync(w => w.Id == id);
-            if (existing == null)
-                return NotFound();
-
-            existing.WorkDate = workDay.WorkDate;
-            existing.TimeIn1 = workDay.TimeIn1;
-            existing.TimeOut1 = workDay.TimeOut1;
-            existing.TimeIn2 = workDay.TimeIn2;
-            existing.TimeOut2 = workDay.TimeOut2;
-            existing.TimeIn3 = workDay.TimeIn3;
-            existing.TimeOut3 = workDay.TimeOut3;
-            existing.BreakMinutes = workDay.BreakMinutes;
-            existing.Comments = workDay.Comments;
-            existing.UpdatedAt = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            if (id != workDay.Id) return BadRequest(new { message = "ID mismatch." });
+            return await _service.UpdateAsync(id, workDay) ? NoContent() : NotFound();
         }
 
         /// <summary>Deletes a work day record.</summary>
         /// <param name="id">The ID of the record to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
-        {
-            var workDay = await TenantScoped(_context.WorkDays)
-                .FirstOrDefaultAsync(w => w.Id == id);
-            if (workDay == null)
-                return NotFound();
-
-            _context.WorkDays.Remove(workDay);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
+            => await _service.DeleteAsync(id) ? NoContent() : NotFound();
     }
 }

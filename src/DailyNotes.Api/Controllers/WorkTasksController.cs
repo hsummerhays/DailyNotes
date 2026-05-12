@@ -1,8 +1,7 @@
+using DailyNotes.Application.Services;
 using DailyNotes.Core.Entities;
-using DailyNotes.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace DailyNotes.Api.Controllers
 {
@@ -11,11 +10,11 @@ namespace DailyNotes.Api.Controllers
     [Authorize]
     public class WorkTasksController : ApiControllerBase
     {
-        private readonly DailyNotesDbContext _context;
+        private readonly IWorkTaskService _service;
 
-        public WorkTasksController(DailyNotesDbContext context)
+        public WorkTasksController(IWorkTaskService service)
         {
-            _context = context;
+            _service = service;
         }
 
         /// <summary>Retrieves all work tasks, optionally filtered by status or project.</summary>
@@ -25,40 +24,20 @@ namespace DailyNotes.Api.Controllers
         public async Task<ActionResult<IEnumerable<WorkTask>>> GetAll(
             [FromQuery] string? status,
             [FromQuery] int? projectId)
-        {
-            var query = TenantScoped(_context.WorkTasks).AsQueryable();
-
-            if (!string.IsNullOrEmpty(status))
-                query = query.Where(t => t.Status == status);
-
-            if (projectId.HasValue)
-                query = query.Where(t => t.ProjectId == projectId.Value);
-
-            return await query.OrderByDescending(t => t.CreatedAt).ToListAsync();
-        }
-
+            => Ok(await _service.GetAllAsync(status, projectId));
 
         /// <summary>Retrieves all overdue work tasks (due date in the past and not completed).</summary>
         [HttpGet("overdue")]
         public async Task<ActionResult<IEnumerable<WorkTask>>> GetOverdue()
-        {
-            var now = DateOnly.FromDateTime(DateTime.UtcNow);
-            return await TenantScoped(_context.WorkTasks)
-                .Where(t => t.DueDate.HasValue && t.DueDate < now && t.Status != "completed")
-                .OrderBy(t => t.DueDate)
-                .ToListAsync();
-        }
+            => Ok(await _service.GetOverdueAsync());
 
         /// <summary>Retrieves a specific work task by its ID.</summary>
         /// <param name="id">The unique ID of the task.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<WorkTask>> GetById(int id)
         {
-            var task = await TenantScoped(_context.WorkTasks)
-                .FirstOrDefaultAsync(t => t.Id == id);
-            if (task == null)
-                return NotFound();
-
+            var task = await _service.GetByIdAsync(id);
+            if (task == null) return NotFound();
             return task;
         }
 
@@ -70,15 +49,8 @@ namespace DailyNotes.Api.Controllers
             if (workTask.ProjectId == null)
                 return BadRequest(new { message = "A linked project is required." });
 
-            workTask.TenantId = CurrentTenantId;
-            workTask.UserId = CurrentUserId;
-            workTask.CreatedAt = DateTime.UtcNow;
-            workTask.UpdatedAt = DateTime.UtcNow;
-
-            _context.WorkTasks.Add(workTask);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetById), new { id = workTask.Id }, workTask);
+            var created = await _service.CreateAsync(workTask);
+            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
         /// <summary>Updates an existing work task.</summary>
@@ -87,45 +59,14 @@ namespace DailyNotes.Api.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, WorkTask workTask)
         {
-            if (id != workTask.Id)
-                return BadRequest(new { message = "ID mismatch." });
-
-            var existing = await TenantScoped(_context.WorkTasks)
-                .FirstOrDefaultAsync(t => t.Id == id);
-            if (existing == null)
-                return NotFound();
-
-            existing.Name = workTask.Name;
-            existing.Status = workTask.Status;
-            existing.StartDate = workTask.StartDate;
-            existing.DueDate = workTask.DueDate;
-            existing.ProjectId = workTask.ProjectId;
-            existing.ParentTaskId = workTask.ParentTaskId;
-            existing.ExternalSource = workTask.ExternalSource;
-            existing.ExternalId = workTask.ExternalId;
-            existing.IsPinned = workTask.IsPinned;
-            existing.Visibility = workTask.Visibility;
-            existing.UpdatedAt = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            if (id != workTask.Id) return BadRequest(new { message = "ID mismatch." });
+            return await _service.UpdateAsync(id, workTask) ? NoContent() : NotFound();
         }
 
         /// <summary>Deletes a work task.</summary>
         /// <param name="id">The ID of the task to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
-        {
-            var task = await TenantScoped(_context.WorkTasks)
-                .FirstOrDefaultAsync(t => t.Id == id);
-            if (task == null)
-                return NotFound();
-
-            _context.WorkTasks.Remove(task);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
+            => await _service.DeleteAsync(id) ? NoContent() : NotFound();
     }
 }

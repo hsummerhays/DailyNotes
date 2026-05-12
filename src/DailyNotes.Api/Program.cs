@@ -11,6 +11,9 @@ using System.Net;
 using System.Threading.RateLimiting;
 using DailyNotes.Core.Interfaces;
 using DailyNotes.Infrastructure.Services;
+using DailyNotes.Application;
+using DailyNotes.Application.Services;
+using DailyNotes.Api.Infrastructure;
 using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -105,8 +108,36 @@ builder.Services.AddRateLimiter(options =>
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 });
 
-// Services
+// HTTP context accessor (required by HttpTenantContext)
+builder.Services.AddHttpContextAccessor();
+
+// Tenant context — resolves current user/tenant from JWT claims per request
+builder.Services.AddScoped<ITenantContext, HttpTenantContext>();
+
+// Auth service
 builder.Services.AddScoped<IAuthService, AuthService>();
+
+// Stub provider implementations (replace with real ones when ready)
+builder.Services.AddScoped<IEmailProvider, NullEmailProvider>();
+builder.Services.AddScoped<IFileStorageProvider, NullFileStorageProvider>();
+builder.Services.AddScoped<IAiVisionProvider, NullAiVisionProvider>();
+builder.Services.AddScoped<ISpeechProvider, NullSpeechProvider>();
+
+// Application services
+builder.Services.AddScoped<IWorkDayService, WorkDayService>();
+builder.Services.AddScoped<IWorkNoteService, WorkNoteService>();
+builder.Services.AddScoped<IWorkTaskService, WorkTaskService>();
+builder.Services.AddScoped<IProjectService, ProjectService>();
+builder.Services.AddScoped<ICourseService, CourseService>();
+builder.Services.AddScoped<ITopicService, TopicService>();
+builder.Services.AddScoped<ITopicNoteService, TopicNoteService>();
+builder.Services.AddScoped<ITagService, TagService>();
+builder.Services.AddScoped<IAssignmentService, AssignmentService>();
+builder.Services.AddScoped<IAttachmentService, AttachmentService>();
+builder.Services.AddScoped<IPayPeriodService, PayPeriodService>();
+builder.Services.AddScoped<IQuizService, QuizService>();
+builder.Services.AddScoped<IQuizAttemptService, QuizAttemptService>();
+builder.Services.AddScoped<ISearchService, SearchService>();
 
 var app = builder.Build();
 

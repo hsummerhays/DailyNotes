@@ -1,8 +1,7 @@
+using DailyNotes.Application.Services;
 using DailyNotes.Core.Entities;
-using DailyNotes.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace DailyNotes.Api.Controllers
 {
@@ -11,11 +10,11 @@ namespace DailyNotes.Api.Controllers
     [Authorize]
     public class AttachmentsController : ApiControllerBase
     {
-        private readonly DailyNotesDbContext _context;
+        private readonly IAttachmentService _service;
 
-        public AttachmentsController(DailyNotesDbContext context)
+        public AttachmentsController(IAttachmentService service)
         {
-            _context = context;
+            _service = service;
         }
 
         /// <summary>Retrieves all attachments, optionally filtered by item type and item ID.</summary>
@@ -25,28 +24,15 @@ namespace DailyNotes.Api.Controllers
         public async Task<ActionResult<IEnumerable<Attachment>>> GetAll(
             [FromQuery] string? itemType,
             [FromQuery] int? itemId)
-        {
-            var query = TenantScoped(_context.Attachments).AsQueryable();
-
-            if (!string.IsNullOrEmpty(itemType))
-                query = query.Where(a => a.ItemType == itemType);
-
-            if (itemId.HasValue)
-                query = query.Where(a => a.ItemId == itemId.Value);
-
-            return await query.OrderByDescending(a => a.CreatedAt).ToListAsync();
-        }
+            => Ok(await _service.GetAllAsync(itemType, itemId));
 
         /// <summary>Retrieves a specific attachment by its ID.</summary>
         /// <param name="id">The unique ID of the attachment.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<Attachment>> GetById(int id)
         {
-            var attachment = await TenantScoped(_context.Attachments)
-                .FirstOrDefaultAsync(a => a.Id == id);
-            if (attachment == null)
-                return NotFound();
-
+            var attachment = await _service.GetByIdAsync(id);
+            if (attachment == null) return NotFound();
             return attachment;
         }
 
@@ -55,30 +41,14 @@ namespace DailyNotes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<Attachment>> Create(Attachment attachment)
         {
-            attachment.TenantId = CurrentTenantId;
-            attachment.UserId = CurrentUserId;
-            attachment.CreatedAt = DateTime.UtcNow;
-
-            _context.Attachments.Add(attachment);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetById), new { id = attachment.Id }, attachment);
+            var created = await _service.CreateAsync(attachment);
+            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
         /// <summary>Deletes an attachment record.</summary>
         /// <param name="id">The ID of the attachment to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
-        {
-            var attachment = await TenantScoped(_context.Attachments)
-                .FirstOrDefaultAsync(a => a.Id == id);
-            if (attachment == null)
-                return NotFound();
-
-            _context.Attachments.Remove(attachment);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
+            => await _service.DeleteAsync(id) ? NoContent() : NotFound();
     }
 }

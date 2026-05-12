@@ -1,8 +1,7 @@
+using DailyNotes.Application.Services;
 using DailyNotes.Core.Entities;
-using DailyNotes.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace DailyNotes.Api.Controllers
 {
@@ -11,11 +10,11 @@ namespace DailyNotes.Api.Controllers
     [Authorize]
     public class TopicNotesController : ApiControllerBase
     {
-        private readonly DailyNotesDbContext _context;
+        private readonly ITopicNoteService _service;
 
-        public TopicNotesController(DailyNotesDbContext context)
+        public TopicNotesController(ITopicNoteService service)
         {
-            _context = context;
+            _service = service;
         }
 
         /// <summary>Retrieves all topic notes, optionally filtered by topic or tag.</summary>
@@ -25,34 +24,15 @@ namespace DailyNotes.Api.Controllers
         public async Task<ActionResult<IEnumerable<TopicNote>>> GetAll(
             [FromQuery] int? topicId,
             [FromQuery] int? tagId)
-        {
-            var query = TenantScoped(_context.TopicNotes).AsQueryable();
-
-            if (topicId.HasValue)
-                query = query.Where(n => n.TopicId == topicId.Value);
-
-            if (tagId.HasValue)
-            {
-                var taggedItemIds = _context.ItemTags
-                    .Where(it => it.TagId == tagId.Value && it.ItemType == "topic_note")
-                    .Select(it => it.ItemId);
-
-                query = query.Where(n => taggedItemIds.Contains(n.Id));
-            }
-
-            return await query.OrderByDescending(n => n.CreatedAt).ToListAsync();
-        }
+            => Ok(await _service.GetAllAsync(topicId, tagId));
 
         /// <summary>Retrieves a specific topic note by its ID.</summary>
         /// <param name="id">The unique ID of the topic note.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<TopicNote>> GetById(int id)
         {
-            var note = await TenantScoped(_context.TopicNotes)
-                .FirstOrDefaultAsync(n => n.Id == id);
-            if (note == null)
-                return NotFound();
-
+            var note = await _service.GetByIdAsync(id);
+            if (note == null) return NotFound();
             return note;
         }
 
@@ -61,15 +41,8 @@ namespace DailyNotes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<TopicNote>> Create(TopicNote topicNote)
         {
-            topicNote.TenantId = CurrentTenantId;
-            topicNote.UserId = CurrentUserId;
-            topicNote.CreatedAt = DateTime.UtcNow;
-            topicNote.UpdatedAt = DateTime.UtcNow;
-
-            _context.TopicNotes.Add(topicNote);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetById), new { id = topicNote.Id }, topicNote);
+            var created = await _service.CreateAsync(topicNote);
+            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
         /// <summary>Updates an existing topic note.</summary>
@@ -78,40 +51,14 @@ namespace DailyNotes.Api.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, TopicNote topicNote)
         {
-            if (id != topicNote.Id)
-                return BadRequest(new { message = "ID mismatch." });
-
-            var existing = await TenantScoped(_context.TopicNotes)
-                .FirstOrDefaultAsync(n => n.Id == id);
-            if (existing == null)
-                return NotFound();
-
-            existing.TopicId = topicNote.TopicId;
-            existing.Title = topicNote.Title;
-            existing.Content = topicNote.Content;
-            existing.TimeMinutes = topicNote.TimeMinutes;
-            existing.Visibility = topicNote.Visibility;
-            existing.UpdatedAt = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            if (id != topicNote.Id) return BadRequest(new { message = "ID mismatch." });
+            return await _service.UpdateAsync(id, topicNote) ? NoContent() : NotFound();
         }
 
         /// <summary>Deletes a topic note.</summary>
         /// <param name="id">The ID of the note to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
-        {
-            var note = await TenantScoped(_context.TopicNotes)
-                .FirstOrDefaultAsync(n => n.Id == id);
-            if (note == null)
-                return NotFound();
-
-            _context.TopicNotes.Remove(note);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
+            => await _service.DeleteAsync(id) ? NoContent() : NotFound();
     }
 }

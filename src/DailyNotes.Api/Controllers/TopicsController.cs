@@ -1,8 +1,7 @@
+using DailyNotes.Application.Services;
 using DailyNotes.Core.Entities;
-using DailyNotes.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace DailyNotes.Api.Controllers
 {
@@ -11,42 +10,29 @@ namespace DailyNotes.Api.Controllers
     [Authorize]
     public class TopicsController : ApiControllerBase
     {
-        private readonly DailyNotesDbContext _context;
+        private readonly ITopicService _service;
 
-        public TopicsController(DailyNotesDbContext context)
+        public TopicsController(ITopicService service)
         {
-            _context = context;
+            _service = service;
         }
 
         /// <summary>Retrieves all topics, optionally filtered by a parent topic ID for hierarchy navigation.</summary>
         /// <param name="parentId">The ID of the parent topic. If null, root topics are returned.</param>
         /// <param name="all">If true, returns all topics regardless of parent.</param>
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Topic>>> GetAll([FromQuery] int? parentId, [FromQuery] bool all = false)
-        {
-            var query = TenantScoped(_context.Topics).AsQueryable();
-
-            if (!all)
-            {
-                if (parentId.HasValue)
-                    query = query.Where(t => t.ParentTopicId == parentId.Value);
-                else
-                    query = query.Where(t => t.ParentTopicId == null); // Root topics
-            }
-
-            return await query.OrderBy(t => t.Title).ToListAsync();
-        }
+        public async Task<ActionResult<IEnumerable<Topic>>> GetAll(
+            [FromQuery] int? parentId,
+            [FromQuery] bool all = false)
+            => Ok(await _service.GetAllAsync(parentId, all));
 
         /// <summary>Retrieves a specific topic by its ID.</summary>
         /// <param name="id">The unique ID of the topic.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<Topic>> GetById(int id)
         {
-            var topic = await TenantScoped(_context.Topics)
-                .FirstOrDefaultAsync(t => t.Id == id);
-            if (topic == null)
-                return NotFound();
-
+            var topic = await _service.GetByIdAsync(id);
+            if (topic == null) return NotFound();
             return topic;
         }
 
@@ -55,16 +41,9 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("{id}/children")]
         public async Task<ActionResult<IEnumerable<Topic>>> GetChildren(int id)
         {
-            // Verify parent exists/access
-            var parent = await TenantScoped(_context.Topics)
-                .FirstOrDefaultAsync(t => t.Id == id);
-            if (parent == null)
-                return NotFound();
-
-            return await TenantScoped(_context.Topics)
-                .Where(t => t.ParentTopicId == id)
-                .OrderBy(t => t.Title)
-                .ToListAsync();
+            var children = await _service.GetChildrenAsync(id);
+            if (children == null) return NotFound();
+            return Ok(children);
         }
 
         /// <summary>Retrieves all notes associated with a specific topic.</summary>
@@ -72,18 +51,9 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("{id}/notes")]
         public async Task<ActionResult<IEnumerable<TopicNote>>> GetTopicNotes(int id)
         {
-            var topic = await TenantScoped(_context.Topics)
-                .FirstOrDefaultAsync(t => t.Id == id);
-            if (topic == null)
-                return NotFound();
-
-            // TopicNotes likely need scoping too if they are entities. 
-            // Assuming for now they are children of topic and we have access if we have access to topic.
-            // But better to check. TopicNote likely has TenantId?
-            return await _context.TopicNotes
-                .Where(n => n.TopicId == id)
-                .OrderByDescending(n => n.CreatedAt)
-                .ToListAsync();
+            var notes = await _service.GetNotesForTopicAsync(id);
+            if (notes == null) return NotFound();
+            return Ok(notes);
         }
 
         /// <summary>Creates a new topic.</summary>
@@ -91,15 +61,8 @@ namespace DailyNotes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<Topic>> Create(Topic topic)
         {
-            topic.TenantId = CurrentTenantId;
-            topic.UserId = CurrentUserId;
-            topic.CreatedAt = DateTime.UtcNow;
-            topic.UpdatedAt = DateTime.UtcNow;
-
-            _context.Topics.Add(topic);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetById), new { id = topic.Id }, topic);
+            var created = await _service.CreateAsync(topic);
+            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
         /// <summary>Updates an existing topic.</summary>
@@ -108,42 +71,14 @@ namespace DailyNotes.Api.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, Topic topic)
         {
-            if (id != topic.Id)
-                return BadRequest(new { message = "ID mismatch." });
-
-            var existing = await TenantScoped(_context.Topics)
-                .FirstOrDefaultAsync(t => t.Id == id);
-            if (existing == null)
-                return NotFound();
-
-            existing.Title = topic.Title;
-            existing.Description = topic.Description;
-            existing.ParentTopicId = topic.ParentTopicId;
-            existing.Proficiency = topic.Proficiency;
-            existing.SkillLevel = topic.SkillLevel;
-            existing.Visibility = topic.Visibility;
-            existing.IsPinned = topic.IsPinned;
-            existing.UpdatedAt = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            if (id != topic.Id) return BadRequest(new { message = "ID mismatch." });
+            return await _service.UpdateAsync(id, topic) ? NoContent() : NotFound();
         }
 
         /// <summary>Deletes a topic and its associated subtopics/notes (depending on cascade rules).</summary>
         /// <param name="id">The ID of the topic to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
-        {
-            var topic = await TenantScoped(_context.Topics)
-                .FirstOrDefaultAsync(t => t.Id == id);
-            if (topic == null)
-                return NotFound();
-
-            _context.Topics.Remove(topic);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
+            => await _service.DeleteAsync(id) ? NoContent() : NotFound();
     }
 }

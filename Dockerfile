@@ -6,6 +6,7 @@ WORKDIR /src
 COPY ["src/DailyNotes.Api/DailyNotes.Api.csproj", "src/DailyNotes.Api/"]
 COPY ["src/DailyNotes.Core/DailyNotes.Core.csproj", "src/DailyNotes.Core/"]
 COPY ["src/DailyNotes.Infrastructure/DailyNotes.Infrastructure.csproj", "src/DailyNotes.Infrastructure/"]
+COPY ["src/DailyNotes.Application/DailyNotes.Application.csproj", "src/DailyNotes.Application/"]
 RUN dotnet restore "src/DailyNotes.Api/DailyNotes.Api.csproj"
 
 # Copy everything else and build

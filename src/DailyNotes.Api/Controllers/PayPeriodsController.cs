@@ -1,8 +1,7 @@
+using DailyNotes.Application.Services;
 using DailyNotes.Core.Entities;
-using DailyNotes.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace DailyNotes.Api.Controllers
 {
@@ -11,36 +10,26 @@ namespace DailyNotes.Api.Controllers
     [Authorize]
     public class PayPeriodsController : ApiControllerBase
     {
-        private readonly DailyNotesDbContext _context;
+        private readonly IPayPeriodService _service;
 
-        public PayPeriodsController(DailyNotesDbContext context)
+        public PayPeriodsController(IPayPeriodService service)
         {
-            _context = context;
+            _service = service;
         }
 
         /// <summary>Retrieves all pay periods, optionally filtered by a specific date.</summary>
         /// <param name="date">Filter to find the pay period that includes this date.</param>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<PayPeriod>>> GetAll([FromQuery] DateOnly? date)
-        {
-            var query = TenantScoped(_context.PayPeriods).AsQueryable();
-
-            if (date.HasValue)
-                query = query.Where(p => p.PeriodStartDate <= date.Value && p.PeriodEndDate >= date.Value);
-
-            return await query.OrderByDescending(p => p.PeriodEndDate).ToListAsync();
-        }
+            => Ok(await _service.GetAllAsync(date));
 
         /// <summary>Retrieves a specific pay period by its ID.</summary>
         /// <param name="id">The unique ID of the pay period.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<PayPeriod>> GetById(int id)
         {
-            var period = await TenantScoped(_context.PayPeriods)
-                .FirstOrDefaultAsync(p => p.Id == id);
-            if (period == null)
-                return NotFound();
-
+            var period = await _service.GetByIdAsync(id);
+            if (period == null) return NotFound();
             return period;
         }
 
@@ -49,18 +38,9 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("{id}/work-days")]
         public async Task<ActionResult<IEnumerable<WorkDay>>> GetPayPeriodWorkDays(int id)
         {
-            var period = await TenantScoped(_context.PayPeriods)
-                .FirstOrDefaultAsync(p => p.Id == id);
-            if (period == null)
-                return NotFound();
-
-            var workDays = await TenantScoped(_context.WorkDays)
-                .Where(w => w.WorkDate >= period.PeriodStartDate
-                         && w.WorkDate <= period.PeriodEndDate)
-                .OrderBy(w => w.WorkDate)
-                .ToListAsync();
-
-            return workDays;
+            var workDays = await _service.GetWorkDaysAsync(id);
+            if (workDays == null) return NotFound();
+            return Ok(workDays);
         }
 
         /// <summary>Creates a new pay period record.</summary>
@@ -68,14 +48,8 @@ namespace DailyNotes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<PayPeriod>> Create(PayPeriod payPeriod)
         {
-            payPeriod.TenantId = CurrentTenantId;
-            payPeriod.UserId = CurrentUserId;
-            payPeriod.CreatedAt = DateTime.UtcNow;
-
-            _context.PayPeriods.Add(payPeriod);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetById), new { id = payPeriod.Id }, payPeriod);
+            var created = await _service.CreateAsync(payPeriod);
+            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
         /// <summary>Updates an existing pay period record.</summary>
@@ -84,39 +58,14 @@ namespace DailyNotes.Api.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, PayPeriod payPeriod)
         {
-            if (id != payPeriod.Id)
-                return BadRequest(new { message = "ID mismatch." });
-
-            var existing = await TenantScoped(_context.PayPeriods)
-                .FirstOrDefaultAsync(p => p.Id == id);
-            if (existing == null)
-                return NotFound();
-
-            existing.PeriodStartDate = payPeriod.PeriodStartDate;
-            existing.PeriodEndDate = payPeriod.PeriodEndDate;
-            existing.Holidays = payPeriod.Holidays;
-            existing.PtoReported = payPeriod.PtoReported;
-            existing.PtoDaysOfMonth = payPeriod.PtoDaysOfMonth;
-
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            if (id != payPeriod.Id) return BadRequest(new { message = "ID mismatch." });
+            return await _service.UpdateAsync(id, payPeriod) ? NoContent() : NotFound();
         }
 
         /// <summary>Deletes a pay period record.</summary>
         /// <param name="id">The ID of the pay period to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
-        {
-            var period = await TenantScoped(_context.PayPeriods)
-                .FirstOrDefaultAsync(p => p.Id == id);
-            if (period == null)
-                return NotFound();
-
-            _context.PayPeriods.Remove(period);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
+            => await _service.DeleteAsync(id) ? NoContent() : NotFound();
     }
 }

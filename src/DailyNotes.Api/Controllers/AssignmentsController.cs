@@ -1,8 +1,7 @@
+using DailyNotes.Application.Services;
 using DailyNotes.Core.Entities;
-using DailyNotes.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace DailyNotes.Api.Controllers
 {
@@ -11,11 +10,11 @@ namespace DailyNotes.Api.Controllers
     [Authorize]
     public class AssignmentsController : ApiControllerBase
     {
-        private readonly DailyNotesDbContext _context;
+        private readonly IAssignmentService _service;
 
-        public AssignmentsController(DailyNotesDbContext context)
+        public AssignmentsController(IAssignmentService service)
         {
-            _context = context;
+            _service = service;
         }
 
         /// <summary>Retrieves all assignments, optionally filtered by course, status, or due date.</summary>
@@ -27,31 +26,15 @@ namespace DailyNotes.Api.Controllers
             [FromQuery] int? courseId,
             [FromQuery] string? status,
             [FromQuery] DateTime? dueDate)
-        {
-            var query = TenantScoped(_context.Assignments).AsQueryable();
-
-            if (courseId.HasValue)
-                query = query.Where(a => a.CourseId == courseId.Value);
-
-            if (!string.IsNullOrEmpty(status))
-                query = query.Where(a => a.Status == status);
-
-            if (dueDate.HasValue)
-                query = query.Where(a => a.DueDate.HasValue && a.DueDate.Value.Date == dueDate.Value.Date);
-
-            return await query.OrderBy(a => a.DueDate).ToListAsync();
-        }
+            => Ok(await _service.GetAllAsync(courseId, status, dueDate));
 
         /// <summary>Retrieves a specific assignment by its ID.</summary>
         /// <param name="id">The unique ID of the assignment.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<Assignment>> GetById(int id)
         {
-            var assignment = await TenantScoped(_context.Assignments)
-                .FirstOrDefaultAsync(a => a.Id == id);
-            if (assignment == null)
-                return NotFound();
-
+            var assignment = await _service.GetByIdAsync(id);
+            if (assignment == null) return NotFound();
             return assignment;
         }
 
@@ -60,15 +43,8 @@ namespace DailyNotes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<Assignment>> Create(Assignment assignment)
         {
-            assignment.TenantId = CurrentTenantId;
-            assignment.UserId = CurrentUserId;
-            assignment.CreatedAt = DateTime.UtcNow;
-            assignment.UpdatedAt = DateTime.UtcNow;
-
-            _context.Assignments.Add(assignment);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetById), new { id = assignment.Id }, assignment);
+            var created = await _service.CreateAsync(assignment);
+            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
         /// <summary>Updates an existing assignment record.</summary>
@@ -77,43 +53,14 @@ namespace DailyNotes.Api.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, Assignment assignment)
         {
-            if (id != assignment.Id)
-                return BadRequest(new { message = "ID mismatch." });
-
-            var existing = await TenantScoped(_context.Assignments)
-                .FirstOrDefaultAsync(a => a.Id == id);
-            if (existing == null)
-                return NotFound();
-
-            existing.Title = assignment.Title;
-            existing.Description = assignment.Description;
-            existing.DueDate = assignment.DueDate;
-            existing.Grade = assignment.Grade;
-            existing.MaxGrade = assignment.MaxGrade;
-            existing.Weight = assignment.Weight;
-            existing.Status = assignment.Status;
-            existing.TopicId = assignment.TopicId;
-            existing.UpdatedAt = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            if (id != assignment.Id) return BadRequest(new { message = "ID mismatch." });
+            return await _service.UpdateAsync(id, assignment) ? NoContent() : NotFound();
         }
 
         /// <summary>Deletes an assignment record.</summary>
         /// <param name="id">The ID of the assignment to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
-        {
-            var assignment = await TenantScoped(_context.Assignments)
-                .FirstOrDefaultAsync(a => a.Id == id);
-            if (assignment == null)
-                return NotFound();
-
-            _context.Assignments.Remove(assignment);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
+            => await _service.DeleteAsync(id) ? NoContent() : NotFound();
     }
 }

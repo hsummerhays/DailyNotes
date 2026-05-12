@@ -22,6 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\DailyNotes.Application\DailyNotes.Application.csproj" />
     <ProjectReference Include="..\DailyNotes.Core\DailyNotes.Core.csproj" />
     <ProjectReference Include="..\DailyNotes.Infrastructure\DailyNotes.Infrastructure.csproj" />
   </ItemGroup>
