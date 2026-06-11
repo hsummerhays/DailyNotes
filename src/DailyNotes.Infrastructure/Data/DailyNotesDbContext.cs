@@ -1,12 +1,13 @@
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using DailyNotes.Core.Entities;
+using DailyNotes.Application.Data;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace DailyNotes.Infrastructure.Data
 {
-    public class DailyNotesDbContext : IdentityDbContext
+    public class DailyNotesDbContext : IdentityDbContext, IDailyNotesDataContext
     {
         public DailyNotesDbContext(DbContextOptions<DailyNotesDbContext> options)
             : base(options)
@@ -147,102 +148,16 @@ namespace DailyNotes.Infrastructure.Data
 
             builder.Entity<WebhookSubscription>().ToTable("webhook_subscriptions");
 
-            // Work Days column mapping (PascalCase names as per manual creation)
-            builder.Entity<WorkDay>(entity =>
-            {
-                entity.ToTable("work_days");
-                entity.Property(e => e.Id).HasColumnName("Id");
-                entity.Property(e => e.TenantId).HasColumnName("TenantId");
-                entity.Property(e => e.UserId).HasColumnName("UserId");
-                entity.Property(e => e.WorkDate).HasColumnName("WorkDate");
-                entity.Property(e => e.TimeIn1).HasColumnName("TimeIn1");
-                entity.Property(e => e.TimeOut1).HasColumnName("TimeOut1");
-                entity.Property(e => e.TimeIn2).HasColumnName("TimeIn2");
-                entity.Property(e => e.TimeOut2).HasColumnName("TimeOut2");
-                entity.Property(e => e.TimeIn3).HasColumnName("TimeIn3");
-                entity.Property(e => e.TimeOut3).HasColumnName("TimeOut3");
-                entity.Property(e => e.BreakMinutes).HasColumnName("BreakMinutes");
-                entity.Property(e => e.Comments).HasColumnName("Comments");
-                entity.Property(e => e.CreatedAt).HasColumnName("CreatedAt");
-                entity.Property(e => e.UpdatedAt).HasColumnName("UpdatedAt");
-            });
-
-            // Work Notes column mapping and relationship
+            // Work Notes relationship (NoteDate -> WorkDate FK)
             builder.Entity<WorkNote>(entity =>
             {
-                entity.ToTable("work_notes");
-                entity.Property(e => e.Id).HasColumnName("Id");
-                entity.Property(e => e.TenantId).HasColumnName("TenantId");
-                entity.Property(e => e.UserId).HasColumnName("UserId");
-                entity.Property(e => e.Visibility).HasColumnName("Visibility");
-                entity.Property(e => e.WorkTaskId).HasColumnName("WorkTaskId");
-                entity.Property(e => e.NoteDate).HasColumnName("NoteDate");
-                entity.Property(e => e.Content).HasColumnName("Content").HasColumnType("jsonb");
-                entity.Property(e => e.TimeMinutes).HasColumnName("TimeMinutes");
-                entity.Property(e => e.ExternalSource).HasColumnName("ExternalSource");
-                entity.Property(e => e.ExternalId).HasColumnName("ExternalId");
-                entity.Property(e => e.IsPinned).HasColumnName("IsPinned");
-                entity.Property(e => e.CreatedAt).HasColumnName("CreatedAt");
-                entity.Property(e => e.UpdatedAt).HasColumnName("UpdatedAt");
+                entity.Property(e => e.Content).HasColumnType("jsonb");
 
                 // Relationship via NoteDate -> WorkDate
                 entity.HasOne(n => n.WorkDay)
                       .WithMany(d => d.Notes)
                       .HasForeignKey(n => n.NoteDate)
                       .HasPrincipalKey(d => d.WorkDate);
-            });
-
-            // Work Tasks column mapping
-            builder.Entity<WorkTask>(entity =>
-            {
-                entity.ToTable("work_tasks");
-                entity.Property(e => e.Id).HasColumnName("Id");
-                entity.Property(e => e.TenantId).HasColumnName("TenantId");
-                entity.Property(e => e.UserId).HasColumnName("UserId");
-                entity.Property(e => e.Visibility).HasColumnName("Visibility");
-                entity.Property(e => e.Name).HasColumnName("Name");
-                entity.Property(e => e.Status).HasColumnName("Status");
-                entity.Property(e => e.Comments).HasColumnName("Comments");
-                entity.Property(e => e.StartDate).HasColumnName("StartDate");
-                entity.Property(e => e.DueDate).HasColumnName("DueDate");
-                entity.Property(e => e.ProjectId).HasColumnName("ProjectId");
-                entity.Property(e => e.ParentTaskId).HasColumnName("ParentTaskId");
-                entity.Property(e => e.ExternalSource).HasColumnName("ExternalSource");
-                entity.Property(e => e.ExternalId).HasColumnName("ExternalId");
-                entity.Property(e => e.IsPinned).HasColumnName("IsPinned");
-                entity.Property(e => e.CreatedAt).HasColumnName("CreatedAt");
-                entity.Property(e => e.UpdatedAt).HasColumnName("UpdatedAt");
-            });
-
-            // Projects column mapping
-            builder.Entity<Project>(entity =>
-            {
-                entity.ToTable("projects");
-                entity.Property(e => e.Id).HasColumnName("Id");
-                entity.Property(e => e.TenantId).HasColumnName("TenantId");
-                entity.Property(e => e.UserId).HasColumnName("UserId");
-                entity.Property(e => e.Visibility).HasColumnName("Visibility");
-                entity.Property(e => e.Name).HasColumnName("Name");
-                entity.Property(e => e.Category).HasColumnName("Category");
-                entity.Property(e => e.CreatedDate).HasColumnName("CreatedDate");
-                entity.Property(e => e.CompletedDate).HasColumnName("CompletedDate");
-                entity.Property(e => e.CreatedAt).HasColumnName("CreatedAt");
-                entity.Property(e => e.UpdatedAt).HasColumnName("UpdatedAt");
-            });
-
-            // Pay Periods column mapping
-            builder.Entity<PayPeriod>(entity =>
-            {
-                entity.ToTable("pay_periods");
-                entity.Property(e => e.Id).HasColumnName("Id");
-                entity.Property(e => e.TenantId).HasColumnName("TenantId");
-                entity.Property(e => e.UserId).HasColumnName("UserId");
-                entity.Property(e => e.PeriodStartDate).HasColumnName("PeriodStartDate");
-                entity.Property(e => e.PeriodEndDate).HasColumnName("PeriodEndDate");
-                entity.Property(e => e.Holidays).HasColumnName("Holidays");
-                entity.Property(e => e.PtoReported).HasColumnName("PtoReported");
-                entity.Property(e => e.PtoDaysOfMonth).HasColumnName("PtoDaysOfMonth");
-                entity.Property(e => e.CreatedAt).HasColumnName("CreatedAt");
             });
 
             // SQLite / InMemory fallback for JsonDocument types

@@ -1,12 +1,12 @@
-using DailyNotes.Core.Interfaces;
-using DailyNotes.Infrastructure.Data;
+using DailyNotes.Application.Data;
+using DailyNotes.Core.Exceptions;
 using Microsoft.EntityFrameworkCore;
 
 namespace DailyNotes.Application.Services
 {
     public class SearchService : ApplicationServiceBase, ISearchService
     {
-        public SearchService(DailyNotesDbContext db, ITenantContext tc) : base(db, tc) { }
+        public SearchService(IDailyNotesDataContext db, ITenantContext tc, TimeProvider clock) : base(db, tc, clock) { }
 
         public async Task<Dictionary<string, object>> SearchAsync(
             string q,
@@ -16,6 +16,10 @@ namespace DailyNotes.Application.Services
             int? projectId,
             string? statuses)
         {
+            var validTypes = new[] { "all", "notes", "tasks", "topics" };
+            if (!validTypes.Contains(type))
+                throw new DomainException($"Invalid search type '{type}'. Valid values: {string.Join(", ", validTypes)}.");
+
             var searchTerm = q.ToLower();
             var results = new Dictionary<string, object>();
 
@@ -39,10 +43,12 @@ namespace DailyNotes.Application.Services
                         _db.WorkTasks.Any(t => t.Id == n.WorkTaskId && sList.Contains(t.Status)));
                 }
 
-                // Load recent notes then filter JSON content in memory
-                var notes = await notesQuery.OrderByDescending(n => n.NoteDate).Take(50).ToListAsync();
-                notes = notes.Where(n => n.Content.RootElement.ToString().ToLower().Contains(searchTerm)).ToList();
-                results["workNotes"] = notes;
+                // Use EF.Functions.Like to push filtering into the database.
+                // For Postgres/JSONB, this performs a case-insensitive text search on the JSON column.
+                notesQuery = notesQuery.Where(n => EF.Functions.Like(
+                    EF.Property<string>(n, "Content").ToLower(), $"%{searchTerm}%"));
+
+                results["workNotes"] = await notesQuery.OrderByDescending(n => n.NoteDate).ToListAsync();
             }
 
             if (type == "all" || type == "tasks")

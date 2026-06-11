@@ -1,3 +1,4 @@
+using DailyNotes.Application.DTOs.Requests;
 using DailyNotes.Application.Services;
 using DailyNotes.Core.Entities;
 using Microsoft.AspNetCore.Authorization;
@@ -34,23 +35,20 @@ namespace DailyNotes.Api.Controllers
         }
 
         /// <summary>Creates a new course.</summary>
-        /// <param name="course">The course data to be created.</param>
+        /// <param name="request">The course data to be created.</param>
         [HttpPost]
-        public async Task<ActionResult<Course>> Create(Course course)
+        public async Task<ActionResult<Course>> Create(CourseRequest request)
         {
-            var created = await _service.CreateAsync(course);
+            var created = await _service.CreateAsync(request);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
         /// <summary>Updates an existing course record.</summary>
         /// <param name="id">The ID of the course to update.</param>
-        /// <param name="course">The updated course data.</param>
+        /// <param name="request">The updated course data.</param>
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, Course course)
-        {
-            if (id != course.Id) return BadRequest(new { message = "ID mismatch." });
-            return await _service.UpdateAsync(id, course) ? NoContent() : NotFound();
-        }
+        public async Task<IActionResult> Update(int id, CourseRequest request)
+            => await _service.UpdateAsync(id, request) ? NoContent() : NotFound();
 
         /// <summary>Deletes a course record.</summary>
         /// <param name="id">The ID of the course to delete.</param>

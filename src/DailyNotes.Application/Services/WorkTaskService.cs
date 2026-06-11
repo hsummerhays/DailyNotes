@@ -1,12 +1,13 @@
+using DailyNotes.Application.Data;
+using DailyNotes.Application.DTOs.Requests;
 using DailyNotes.Core.Entities;
-using DailyNotes.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace DailyNotes.Application.Services
 {
     public class WorkTaskService : ApplicationServiceBase, IWorkTaskService
     {
-        public WorkTaskService(DailyNotesDbContext db, ITenantContext tc) : base(db, tc) { }
+        public WorkTaskService(IDailyNotesDataContext db, ITenantContext tc, TimeProvider clock) : base(db, tc, clock) { }
 
         public async Task<IEnumerable<WorkTask>> GetAllAsync(string? status, int? projectId)
         {
@@ -20,7 +21,7 @@ namespace DailyNotes.Application.Services
 
         public async Task<IEnumerable<WorkTask>> GetOverdueAsync()
         {
-            var now = DateOnly.FromDateTime(DateTime.UtcNow);
+            var now = DateOnly.FromDateTime(_clock.GetUtcNow().UtcDateTime);
             return await TenantScoped(_db.WorkTasks)
                 .Where(t => t.DueDate.HasValue && t.DueDate < now && t.Status != "completed")
                 .OrderBy(t => t.DueDate)
@@ -30,35 +31,50 @@ namespace DailyNotes.Application.Services
         public async Task<WorkTask?> GetByIdAsync(int id)
             => await TenantScoped(_db.WorkTasks).FirstOrDefaultAsync(t => t.Id == id);
 
-        public async Task<WorkTask> CreateAsync(WorkTask workTask)
+        public async Task<WorkTask> CreateAsync(WorkTaskRequest request)
         {
-            workTask.TenantId = _tc.TenantId;
-            workTask.UserId = _tc.UserId;
-            workTask.CreatedAt = DateTime.UtcNow;
-            workTask.UpdatedAt = DateTime.UtcNow;
+            var now = _clock.GetUtcNow().UtcDateTime;
+            var workTask = new WorkTask
+            {
+                TenantId = _tc.TenantId,
+                UserId = _tc.UserId,
+                Name = request.Name,
+                Status = request.Status,
+                Comments = request.Comments,
+                StartDate = request.StartDate,
+                DueDate = request.DueDate,
+                ProjectId = request.ProjectId,
+                ParentTaskId = request.ParentTaskId,
+                ExternalSource = request.ExternalSource,
+                ExternalId = request.ExternalId,
+                IsPinned = request.IsPinned,
+                Visibility = request.Visibility,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
 
             _db.WorkTasks.Add(workTask);
             await _db.SaveChangesAsync();
             return workTask;
         }
 
-        public async Task<bool> UpdateAsync(int id, WorkTask workTask)
+        public async Task<bool> UpdateAsync(int id, WorkTaskRequest request)
         {
             var existing = await TenantScoped(_db.WorkTasks).FirstOrDefaultAsync(t => t.Id == id);
             if (existing == null) return false;
 
-            existing.Name = workTask.Name;
-            existing.Status = workTask.Status;
-            existing.StartDate = workTask.StartDate;
-            existing.DueDate = workTask.DueDate;
-            existing.ProjectId = workTask.ProjectId;
-            existing.ParentTaskId = workTask.ParentTaskId;
-            existing.ExternalSource = workTask.ExternalSource;
-            existing.ExternalId = workTask.ExternalId;
-            existing.IsPinned = workTask.IsPinned;
-            existing.Visibility = workTask.Visibility;
-            existing.Comments = workTask.Comments;
-            existing.UpdatedAt = DateTime.UtcNow;
+            existing.Name = request.Name;
+            existing.Status = request.Status;
+            existing.StartDate = request.StartDate;
+            existing.DueDate = request.DueDate;
+            existing.ProjectId = request.ProjectId;
+            existing.ParentTaskId = request.ParentTaskId;
+            existing.ExternalSource = request.ExternalSource;
+            existing.ExternalId = request.ExternalId;
+            existing.IsPinned = request.IsPinned;
+            existing.Visibility = request.Visibility;
+            existing.Comments = request.Comments;
+            existing.UpdatedAt = _clock.GetUtcNow().UtcDateTime;
 
             await _db.SaveChangesAsync();
             return true;

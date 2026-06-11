@@ -1,17 +1,21 @@
+using DailyNotes.Application.Data;
 using DailyNotes.Application.DTOs;
 using DailyNotes.Core.Entities;
-using DailyNotes.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace DailyNotes.Application.Services
 {
     public class QuizAttemptService : ApplicationServiceBase, IQuizAttemptService
     {
-        public QuizAttemptService(DailyNotesDbContext db, ITenantContext tc) : base(db, tc) { }
+        public QuizAttemptService(IDailyNotesDataContext db, ITenantContext tc, TimeProvider clock) : base(db, tc, clock) { }
 
         public async Task<IEnumerable<QuizAttempt>> GetAllAsync(int? quizId)
         {
-            var query = _db.QuizAttempts.Where(a => a.UserId == _tc.UserId).AsQueryable();
+            // Filter by both UserId and TenantId (via quiz membership) for consistency
+            var query = _db.QuizAttempts
+                .Where(a => a.UserId == _tc.UserId
+                    && _db.Quizzes.Any(q => q.Id == a.QuizId && q.TenantId == _tc.TenantId))
+                .AsQueryable();
 
             if (quizId.HasValue) query = query.Where(a => a.QuizId == quizId.Value);
 
@@ -20,7 +24,9 @@ namespace DailyNotes.Application.Services
 
         public async Task<QuizAttemptDetailDto?> GetByIdAsync(int id)
         {
-            var attempt = await _db.QuizAttempts.FindAsync(id);
+            // Bug A fix: scope to current user
+            var attempt = await _db.QuizAttempts
+                .FirstOrDefaultAsync(a => a.Id == id && a.UserId == _tc.UserId);
             if (attempt == null) return null;
 
             var answers = await _db.QuizAnswers.Where(a => a.AttemptId == id).ToListAsync();
@@ -41,7 +47,7 @@ namespace DailyNotes.Application.Services
             {
                 QuizId = submission.QuizId,
                 UserId = _tc.UserId,
-                StartedAt = DateTime.UtcNow
+                StartedAt = _clock.GetUtcNow().UtcDateTime
             };
 
             _db.QuizAttempts.Add(attempt);
@@ -53,7 +59,9 @@ namespace DailyNotes.Application.Services
             foreach (var answer in submission.Answers)
             {
                 var option = await _db.QuizOptions.FindAsync(answer.SelectedOptionId);
-                bool isCorrect = option?.IsCorrect ?? false;
+
+                // Bug B fix: verify the option belongs to the submitted question
+                bool isCorrect = option?.IsCorrect == true && option?.QuestionId == answer.QuestionId;
                 if (isCorrect) correct++;
 
                 _db.QuizAnswers.Add(new QuizAnswer
@@ -66,7 +74,7 @@ namespace DailyNotes.Application.Services
             }
 
             attempt.Score = total > 0 ? (decimal)correct / total * 100 : 0;
-            attempt.CompletedAt = DateTime.UtcNow;
+            attempt.CompletedAt = _clock.GetUtcNow().UtcDateTime;
 
             await _db.SaveChangesAsync();
             await transaction.CommitAsync();

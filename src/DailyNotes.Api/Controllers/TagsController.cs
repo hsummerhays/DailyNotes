@@ -1,3 +1,4 @@
+using DailyNotes.Application.DTOs.Requests;
 using DailyNotes.Application.Services;
 using DailyNotes.Core.Entities;
 using Microsoft.AspNetCore.Authorization;
@@ -33,23 +34,20 @@ namespace DailyNotes.Api.Controllers
         }
 
         /// <summary>Creates a new tag.</summary>
-        /// <param name="tag">The tag data to be created.</param>
+        /// <param name="request">The tag data to be created.</param>
         [HttpPost]
-        public async Task<ActionResult<Tag>> Create(Tag tag)
+        public async Task<ActionResult<Tag>> Create(TagRequest request)
         {
-            var created = await _service.CreateAsync(tag);
+            var created = await _service.CreateAsync(request);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
         /// <summary>Updates an existing tag record.</summary>
         /// <param name="id">The ID of the tag to update.</param>
-        /// <param name="tag">The updated tag data.</param>
+        /// <param name="request">The updated tag data.</param>
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, Tag tag)
-        {
-            if (id != tag.Id) return BadRequest(new { message = "ID mismatch." });
-            return await _service.UpdateAsync(id, tag) ? NoContent() : NotFound();
-        }
+        public async Task<IActionResult> Update(int id, TagRequest request)
+            => await _service.UpdateAsync(id, request) ? NoContent() : NotFound();
 
         /// <summary>Deletes a tag record.</summary>
         /// <param name="id">The ID of the tag to delete.</param>

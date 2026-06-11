@@ -1,12 +1,13 @@
+using DailyNotes.Application.Data;
+using DailyNotes.Application.DTOs.Requests;
 using DailyNotes.Core.Entities;
-using DailyNotes.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace DailyNotes.Application.Services
 {
     public class TopicNoteService : ApplicationServiceBase, ITopicNoteService
     {
-        public TopicNoteService(DailyNotesDbContext db, ITenantContext tc) : base(db, tc) { }
+        public TopicNoteService(IDailyNotesDataContext db, ITenantContext tc, TimeProvider clock) : base(db, tc, clock) { }
 
         public async Task<IEnumerable<TopicNote>> GetAllAsync(int? topicId, int? tagId)
         {
@@ -28,29 +29,38 @@ namespace DailyNotes.Application.Services
         public async Task<TopicNote?> GetByIdAsync(int id)
             => await TenantScoped(_db.TopicNotes).FirstOrDefaultAsync(n => n.Id == id);
 
-        public async Task<TopicNote> CreateAsync(TopicNote topicNote)
+        public async Task<TopicNote> CreateAsync(TopicNoteRequest request)
         {
-            topicNote.TenantId = _tc.TenantId;
-            topicNote.UserId = _tc.UserId;
-            topicNote.CreatedAt = DateTime.UtcNow;
-            topicNote.UpdatedAt = DateTime.UtcNow;
+            var now = _clock.GetUtcNow().UtcDateTime;
+            var topicNote = new TopicNote
+            {
+                TenantId = _tc.TenantId,
+                UserId = _tc.UserId,
+                TopicId = request.TopicId,
+                Title = request.Title,
+                Content = request.Content,
+                TimeMinutes = request.TimeMinutes,
+                Visibility = request.Visibility,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
 
             _db.TopicNotes.Add(topicNote);
             await _db.SaveChangesAsync();
             return topicNote;
         }
 
-        public async Task<bool> UpdateAsync(int id, TopicNote topicNote)
+        public async Task<bool> UpdateAsync(int id, TopicNoteRequest request)
         {
             var existing = await TenantScoped(_db.TopicNotes).FirstOrDefaultAsync(n => n.Id == id);
             if (existing == null) return false;
 
-            existing.TopicId = topicNote.TopicId;
-            existing.Title = topicNote.Title;
-            existing.Content = topicNote.Content;
-            existing.TimeMinutes = topicNote.TimeMinutes;
-            existing.Visibility = topicNote.Visibility;
-            existing.UpdatedAt = DateTime.UtcNow;
+            existing.TopicId = request.TopicId;
+            existing.Title = request.Title;
+            existing.Content = request.Content;
+            existing.TimeMinutes = request.TimeMinutes;
+            existing.Visibility = request.Visibility;
+            existing.UpdatedAt = _clock.GetUtcNow().UtcDateTime;
 
             await _db.SaveChangesAsync();
             return true;

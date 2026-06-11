@@ -1,3 +1,4 @@
+using DailyNotes.Application.DTOs.Requests;
 using DailyNotes.Core.Entities;
 
 namespace DailyNotes.Application.Services
@@ -6,8 +7,8 @@ namespace DailyNotes.Application.Services
     {
         Task<IEnumerable<Assignment>> GetAllAsync(int? courseId, string? status, DateTime? dueDate);
         Task<Assignment?> GetByIdAsync(int id);
-        Task<Assignment> CreateAsync(Assignment assignment);
-        Task<bool> UpdateAsync(int id, Assignment assignment);
+        Task<Assignment> CreateAsync(AssignmentRequest request);
+        Task<bool> UpdateAsync(int id, AssignmentRequest request);
         Task<bool> DeleteAsync(int id);
     }
 }

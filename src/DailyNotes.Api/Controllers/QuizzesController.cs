@@ -1,3 +1,4 @@
+using DailyNotes.Application.DTOs.Requests;
 using DailyNotes.Application.Services;
 using DailyNotes.Core.Entities;
 using Microsoft.AspNetCore.Authorization;
@@ -37,23 +38,20 @@ namespace DailyNotes.Api.Controllers
         }
 
         /// <summary>Creates a new quiz.</summary>
-        /// <param name="quiz">The quiz data to be created.</param>
+        /// <param name="request">The quiz data to be created.</param>
         [HttpPost]
-        public async Task<ActionResult<Quiz>> Create(Quiz quiz)
+        public async Task<ActionResult<Quiz>> Create(QuizRequest request)
         {
-            var created = await _service.CreateAsync(quiz);
+            var created = await _service.CreateAsync(request);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
         /// <summary>Updates an existing quiz.</summary>
         /// <param name="id">The ID of the quiz to update.</param>
-        /// <param name="quiz">The updated quiz data.</param>
+        /// <param name="request">The updated quiz data.</param>
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, Quiz quiz)
-        {
-            if (id != quiz.Id) return BadRequest(new { message = "ID mismatch." });
-            return await _service.UpdateAsync(id, quiz) ? NoContent() : NotFound();
-        }
+        public async Task<IActionResult> Update(int id, QuizRequest request)
+            => await _service.UpdateAsync(id, request) ? NoContent() : NotFound();
 
         /// <summary>Deletes a quiz and all its associated questions and options.</summary>
         /// <param name="id">The ID of the quiz to delete.</param>
@@ -63,22 +61,22 @@ namespace DailyNotes.Api.Controllers
 
         /// <summary>Adds a new question to a specific quiz.</summary>
         /// <param name="quizId">The ID of the quiz.</param>
-        /// <param name="question">The question data to be added.</param>
+        /// <param name="request">The question data to be added.</param>
         [HttpPost("{quizId}/questions")]
-        public async Task<ActionResult<QuizQuestion>> AddQuestion(int quizId, QuizQuestion question)
+        public async Task<ActionResult<QuizQuestion>> AddQuestion(int quizId, QuizQuestionRequest request)
         {
-            var result = await _service.AddQuestionAsync(quizId, question);
+            var result = await _service.AddQuestionAsync(quizId, request);
             if (result == null) return NotFound(new { message = "Quiz not found." });
             return Ok(result);
         }
 
         /// <summary>Adds a new option to a specific quiz question.</summary>
         /// <param name="questionId">The ID of the quiz question.</param>
-        /// <param name="option">The option data to be added.</param>
+        /// <param name="request">The option data to be added.</param>
         [HttpPost("questions/{questionId}/options")]
-        public async Task<ActionResult<QuizOption>> AddOption(int questionId, QuizOption option)
+        public async Task<ActionResult<QuizOption>> AddOption(int questionId, QuizOptionRequest request)
         {
-            var result = await _service.AddOptionAsync(questionId, option);
+            var result = await _service.AddOptionAsync(questionId, request);
             if (result == null) return NotFound(new { message = "Question not found or access denied." });
             return Ok(result);
         }

@@ -1,3 +1,4 @@
+using DailyNotes.Application.DTOs.Requests;
 using DailyNotes.Application.Services;
 using DailyNotes.Core.Entities;
 using Microsoft.AspNetCore.Authorization;
@@ -42,26 +43,23 @@ namespace DailyNotes.Api.Controllers
         }
 
         /// <summary>Creates a new work task. A linked project is required.</summary>
-        /// <param name="workTask">The task to be created.</param>
+        /// <param name="request">The task to be created.</param>
         [HttpPost]
-        public async Task<ActionResult<WorkTask>> Create(WorkTask workTask)
+        public async Task<ActionResult<WorkTask>> Create(WorkTaskRequest request)
         {
-            if (workTask.ProjectId == null)
+            if (request.ProjectId == null)
                 return BadRequest(new { message = "A linked project is required." });
 
-            var created = await _service.CreateAsync(workTask);
+            var created = await _service.CreateAsync(request);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
         /// <summary>Updates an existing work task.</summary>
         /// <param name="id">The ID of the task to update.</param>
-        /// <param name="workTask">The updated task content.</param>
+        /// <param name="request">The updated task content.</param>
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, WorkTask workTask)
-        {
-            if (id != workTask.Id) return BadRequest(new { message = "ID mismatch." });
-            return await _service.UpdateAsync(id, workTask) ? NoContent() : NotFound();
-        }
+        public async Task<IActionResult> Update(int id, WorkTaskRequest request)
+            => await _service.UpdateAsync(id, request) ? NoContent() : NotFound();
 
         /// <summary>Deletes a work task.</summary>
         /// <param name="id">The ID of the task to delete.</param>

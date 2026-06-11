@@ -1,12 +1,13 @@
+using DailyNotes.Application.Data;
+using DailyNotes.Application.DTOs.Requests;
 using DailyNotes.Core.Entities;
-using DailyNotes.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace DailyNotes.Application.Services
 {
     public class TopicService : ApplicationServiceBase, ITopicService
     {
-        public TopicService(DailyNotesDbContext db, ITenantContext tc) : base(db, tc) { }
+        public TopicService(IDailyNotesDataContext db, ITenantContext tc, TimeProvider clock) : base(db, tc, clock) { }
 
         public async Task<IEnumerable<Topic>> GetAllAsync(int? parentId, bool all)
         {
@@ -47,31 +48,42 @@ namespace DailyNotes.Application.Services
                 .ToListAsync();
         }
 
-        public async Task<Topic> CreateAsync(Topic topic)
+        public async Task<Topic> CreateAsync(TopicRequest request)
         {
-            topic.TenantId = _tc.TenantId;
-            topic.UserId = _tc.UserId;
-            topic.CreatedAt = DateTime.UtcNow;
-            topic.UpdatedAt = DateTime.UtcNow;
+            var now = _clock.GetUtcNow().UtcDateTime;
+            var topic = new Topic
+            {
+                TenantId = _tc.TenantId,
+                UserId = _tc.UserId,
+                Title = request.Title,
+                Description = request.Description,
+                ParentTopicId = request.ParentTopicId,
+                Proficiency = request.Proficiency,
+                SkillLevel = request.SkillLevel,
+                IsPinned = request.IsPinned,
+                Visibility = request.Visibility,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
 
             _db.Topics.Add(topic);
             await _db.SaveChangesAsync();
             return topic;
         }
 
-        public async Task<bool> UpdateAsync(int id, Topic topic)
+        public async Task<bool> UpdateAsync(int id, TopicRequest request)
         {
             var existing = await TenantScoped(_db.Topics).FirstOrDefaultAsync(t => t.Id == id);
             if (existing == null) return false;
 
-            existing.Title = topic.Title;
-            existing.Description = topic.Description;
-            existing.ParentTopicId = topic.ParentTopicId;
-            existing.Proficiency = topic.Proficiency;
-            existing.SkillLevel = topic.SkillLevel;
-            existing.Visibility = topic.Visibility;
-            existing.IsPinned = topic.IsPinned;
-            existing.UpdatedAt = DateTime.UtcNow;
+            existing.Title = request.Title;
+            existing.Description = request.Description;
+            existing.ParentTopicId = request.ParentTopicId;
+            existing.Proficiency = request.Proficiency;
+            existing.SkillLevel = request.SkillLevel;
+            existing.Visibility = request.Visibility;
+            existing.IsPinned = request.IsPinned;
+            existing.UpdatedAt = _clock.GetUtcNow().UtcDateTime;
 
             await _db.SaveChangesAsync();
             return true;

@@ -1,3 +1,4 @@
+using DailyNotes.Application.DTOs.Requests;
 using DailyNotes.Application.Services;
 using DailyNotes.Core.Entities;
 using Microsoft.AspNetCore.Authorization;
@@ -43,23 +44,20 @@ namespace DailyNotes.Api.Controllers
         }
 
         /// <summary>Creates a new project.</summary>
-        /// <param name="project">The project data to be created.</param>
+        /// <param name="request">The project data to be created.</param>
         [HttpPost]
-        public async Task<ActionResult<Project>> Create(Project project)
+        public async Task<ActionResult<Project>> Create(ProjectRequest request)
         {
-            var created = await _service.CreateAsync(project);
+            var created = await _service.CreateAsync(request);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
         /// <summary>Updates an existing project record.</summary>
         /// <param name="id">The ID of the project to update.</param>
-        /// <param name="project">The updated project data.</param>
+        /// <param name="request">The updated project data.</param>
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, Project project)
-        {
-            if (id != project.Id) return BadRequest(new { message = "ID mismatch." });
-            return await _service.UpdateAsync(id, project) ? NoContent() : NotFound();
-        }
+        public async Task<IActionResult> Update(int id, ProjectRequest request)
+            => await _service.UpdateAsync(id, request) ? NoContent() : NotFound();
 
         /// <summary>Deletes a project and its associated metadata (tasks remain but are unlinked if handled by DB).</summary>
         /// <param name="id">The ID of the project to delete.</param>

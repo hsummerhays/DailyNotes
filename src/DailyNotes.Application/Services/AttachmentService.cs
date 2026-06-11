@@ -1,12 +1,13 @@
+using DailyNotes.Application.Data;
+using DailyNotes.Application.DTOs.Requests;
 using DailyNotes.Core.Entities;
-using DailyNotes.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace DailyNotes.Application.Services
 {
     public class AttachmentService : ApplicationServiceBase, IAttachmentService
     {
-        public AttachmentService(DailyNotesDbContext db, ITenantContext tc) : base(db, tc) { }
+        public AttachmentService(IDailyNotesDataContext db, ITenantContext tc, TimeProvider clock) : base(db, tc, clock) { }
 
         public async Task<IEnumerable<Attachment>> GetAllAsync(string? itemType, int? itemId)
         {
@@ -21,11 +22,25 @@ namespace DailyNotes.Application.Services
         public async Task<Attachment?> GetByIdAsync(int id)
             => await TenantScoped(_db.Attachments).FirstOrDefaultAsync(a => a.Id == id);
 
-        public async Task<Attachment> CreateAsync(Attachment attachment)
+        public async Task<Attachment> CreateAsync(AttachmentRequest request)
         {
-            attachment.TenantId = _tc.TenantId;
-            attachment.UserId = _tc.UserId;
-            attachment.CreatedAt = DateTime.UtcNow;
+            var attachment = new Attachment
+            {
+                TenantId = _tc.TenantId,
+                UserId = _tc.UserId,
+                ItemType = request.ItemType,
+                ItemId = request.ItemId,
+                FileName = request.FileName,
+                ContentType = request.ContentType,
+                StoragePath = request.StoragePath,
+                FileSizeBytes = request.FileSizeBytes,
+                Source = request.Source,
+                ExternalUrl = request.ExternalUrl,
+                OcrText = request.OcrText,
+                Transcription = request.Transcription,
+                DurationSeconds = request.DurationSeconds,
+                CreatedAt = _clock.GetUtcNow().UtcDateTime
+            };
 
             _db.Attachments.Add(attachment);
             await _db.SaveChangesAsync();

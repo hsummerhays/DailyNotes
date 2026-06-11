@@ -1,12 +1,13 @@
+using DailyNotes.Application.Data;
+using DailyNotes.Application.DTOs.Requests;
 using DailyNotes.Core.Entities;
-using DailyNotes.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace DailyNotes.Application.Services
 {
     public class AssignmentService : ApplicationServiceBase, IAssignmentService
     {
-        public AssignmentService(DailyNotesDbContext db, ITenantContext tc) : base(db, tc) { }
+        public AssignmentService(IDailyNotesDataContext db, ITenantContext tc, TimeProvider clock) : base(db, tc, clock) { }
 
         public async Task<IEnumerable<Assignment>> GetAllAsync(int? courseId, string? status, DateTime? dueDate)
         {
@@ -22,32 +23,45 @@ namespace DailyNotes.Application.Services
         public async Task<Assignment?> GetByIdAsync(int id)
             => await TenantScoped(_db.Assignments).FirstOrDefaultAsync(a => a.Id == id);
 
-        public async Task<Assignment> CreateAsync(Assignment assignment)
+        public async Task<Assignment> CreateAsync(AssignmentRequest request)
         {
-            assignment.TenantId = _tc.TenantId;
-            assignment.UserId = _tc.UserId;
-            assignment.CreatedAt = DateTime.UtcNow;
-            assignment.UpdatedAt = DateTime.UtcNow;
+            var now = _clock.GetUtcNow().UtcDateTime;
+            var assignment = new Assignment
+            {
+                TenantId = _tc.TenantId,
+                UserId = _tc.UserId,
+                CourseId = request.CourseId,
+                Title = request.Title,
+                Description = request.Description,
+                DueDate = request.DueDate,
+                Status = request.Status,
+                Grade = request.Grade,
+                MaxGrade = request.MaxGrade,
+                Weight = request.Weight,
+                TopicId = request.TopicId,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
 
             _db.Assignments.Add(assignment);
             await _db.SaveChangesAsync();
             return assignment;
         }
 
-        public async Task<bool> UpdateAsync(int id, Assignment assignment)
+        public async Task<bool> UpdateAsync(int id, AssignmentRequest request)
         {
             var existing = await TenantScoped(_db.Assignments).FirstOrDefaultAsync(a => a.Id == id);
             if (existing == null) return false;
 
-            existing.Title = assignment.Title;
-            existing.Description = assignment.Description;
-            existing.DueDate = assignment.DueDate;
-            existing.Grade = assignment.Grade;
-            existing.MaxGrade = assignment.MaxGrade;
-            existing.Weight = assignment.Weight;
-            existing.Status = assignment.Status;
-            existing.TopicId = assignment.TopicId;
-            existing.UpdatedAt = DateTime.UtcNow;
+            existing.Title = request.Title;
+            existing.Description = request.Description;
+            existing.DueDate = request.DueDate;
+            existing.Grade = request.Grade;
+            existing.MaxGrade = request.MaxGrade;
+            existing.Weight = request.Weight;
+            existing.Status = request.Status;
+            existing.TopicId = request.TopicId;
+            existing.UpdatedAt = _clock.GetUtcNow().UtcDateTime;
 
             await _db.SaveChangesAsync();
             return true;
