@@ -5,9 +5,17 @@
 | Item | Notes |
 |---|---|
 | **Clean Architecture refactor** | `DailyNotes.Application` layer added; all controllers inject service interfaces, no direct DbContext access |
+| **IDailyNotesDataContext interface** | Application layer no longer references Infrastructure directly; `DailyNotesDbContext` implements the interface; Application services are independently testable |
+| **Request DTOs** | All POST/PUT endpoints accept typed request DTOs instead of raw domain entities — clients cannot supply `TenantId`, `UserId`, or `CreatedAt` |
+| **DomainException** | Typed exception with `StatusCode`; auth and validation failures return 400/401 instead of 500 |
+| **TimeProvider injection** | `ApplicationServiceBase` accepts `TimeProvider`; all `DateTime.UtcNow` calls replaced — services are clock-testable |
+| **pageSize cap** | All paginated endpoints capped at 100 records per page |
+| **Quiz security fixes** | `QuizAttemptService.GetByIdAsync` scoped to current user; `SubmitAsync` validates each option belongs to its question |
+| **SearchService** | Type parameter validated; JSON content filtering pushed to the DB via `EF.Functions.Like` |
 | **Provider stubs registered** | `NullEmailProvider`, `NullFileStorageProvider`, `NullAiVisionProvider`, `NullSpeechProvider` registered in DI — ready to swap for real implementations |
 | **Transaction management** | `WorkNoteService.CreateAsync` (WorkDay auto-create) and `QuizAttemptService.SubmitAsync` (scoring) wrapped in DB transactions |
 | **TopicNote security fix** | `GET /api/topics/{id}/notes` now correctly scopes TopicNotes by tenant + user |
+| **Program.cs extension methods** | DI registration split into `AddApplicationServices`, `AddInfrastructureServices`, `AddAuthConfiguration`, `AddSwaggerConfiguration` |
 
 ---
 
@@ -83,15 +91,31 @@
 | **reMarkable Sync** | Import handwritten pages via reMarkable Cloud API → OCR |
 | **OneNote Sync** | Two-way sync via Microsoft Graph API |
 
+## Backend & Infrastructure Improvements
+
+| Feature | Description |
+|---|---|
+| **Pagination response envelope** | Return `{ items, total, page, pageSize, totalPages }` instead of raw arrays — clients need `total` to render pagination controls |
+| **Health checks** | `GET /health` endpoint via `AddHealthChecks().AddDbContext<DailyNotesDbContext>()`; include DB connectivity, disk, and memory checks |
+| **OpenTelemetry** | Add structured logging (Serilog/structured), distributed tracing, and metrics via `OpenTelemetry.Extensions.Hosting`; export to Seq, Grafana, or Azure Monitor |
+| **Role-based authorization** | Enforce the `role` JWT claim — currently present but never checked; add `[Authorize(Roles = "owner")]` guards for destructive or admin-only operations |
+| **Refresh token expiry** | Add `ExpiresAt` to the refresh token record in `asp_net_user_tokens`; reject expired tokens and clean up stale rows |
+| **Optimistic concurrency** | Add `RowVersion` / `ConcurrencyToken` to frequently-edited entities (`WorkNote`, `WorkTask`, `WorkDay`) and return `ETag` headers so concurrent edits fail fast |
+| **Background jobs** | Webhook delivery, email digests, and integration sync need a background processor (Hangfire or Quartz.NET); currently nothing runs outside the request lifecycle |
+| **Unit tests** | `IDailyNotesDataContext` is now an interface — add unit tests for service logic using a mock/fake data context, separate from the existing integration tests |
+| **Database resilience** | Add EF Core retry policy for transient Postgres failures: `options.UseNpgsql(conn, o => o.EnableRetryOnFailure(3))` |
+| **Rate limiting expansion** | Currently only auth endpoints are rate-limited; extend to all write endpoints to prevent abuse |
+| **Response caching** | Add `IMemoryCache` or Redis for frequently-read, rarely-changing data (tags list, topics tree, quiz questions) |
+| **Idempotency keys** | Accept `Idempotency-Key` header on POST endpoints; replay cached responses for duplicate requests |
+
 ## Additional Core Features
 
 | Feature | Description |
 |---|---|
-| **Full-text search (PostgreSQL FTS)** | Replace in-memory JSON content filtering with `tsvector` GIN indexes (schema ready; `SearchService` needs updating) |
+| **Full-text search (PostgreSQL FTS)** | Replace `EF.Functions.Like` with `tsvector` GIN index queries (schema ready; `SearchService` needs updating) |
 | **Soft deletes** | Add `IsDeleted` + `DeletedAt` to entities; update services to filter deleted records |
 | **API versioning** | Add `/api/v1/` prefix; version service interfaces |
-| **FluentValidation** | Add request validators in `DailyNotes.Application/Validators/` |
-| **Request/Response DTOs** | Decouple API contract from EF entities; add mapping layer in Application |
+| **FluentValidation** | Add request validators in `DailyNotes.Application/Validators/` for richer error messages than DataAnnotations |
 | **Export** | CSV/Excel export by date range, project, task |
 | **Monthly Goals** | Restore deferred Monthly Goals & Monthly Goal Tasks tables |
 | **Developer Portal** | API key management, Swagger docs, webhook subscription UI |

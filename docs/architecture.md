@@ -35,8 +35,13 @@ erDiagram
 **Dependency chain (no circular references):**
 
 ```
-Core  ←  Infrastructure  ←  Application  ←  Api
+Core  ←  Infrastructure
+Core  ←  Application  ←  Api
+           ↑
+     Infrastructure (via IDailyNotesDataContext)
 ```
+
+`DailyNotes.Application` does **not** reference `DailyNotes.Infrastructure`. Instead it defines `IDailyNotesDataContext` (in `Application.Data`) which `DailyNotesDbContext` implements. This keeps the Application layer testable without the Infrastructure assembly.
 
 ---
 
@@ -375,8 +380,9 @@ CREATE INDEX ix_assignments_course_id ON assignments(course_id);
 ### [DailyNotes.Application](./src/DailyNotes.Application)
 
 Contains all use-case logic. Services inherit `ApplicationServiceBase` which provides:
-- `DailyNotesDbContext _db` — direct EF Core access
+- `IDailyNotesDataContext _db` — data access via interface (implemented by `DailyNotesDbContext` in Infrastructure)
 - `ITenantContext _tc` — current user/tenant for the request
+- `TimeProvider _clock` — injectable clock; use `_clock.GetUtcNow().UtcDateTime` instead of `DateTime.UtcNow`
 - `TenantScoped<T>(query)` — adds `WHERE TenantId = x AND UserId = y` (for `IHasTenantUser` entities)
 - `TenantOnlyScoped<T>(query)` — adds `WHERE TenantId = x` (for `IHasTenant` entities: `Tag`, `Quiz`)
 
@@ -401,10 +407,17 @@ Contains all use-case logic. Services inherit `ApplicationServiceBase` which pro
 
 **`ITenantContext`** is defined here and implemented in the Api layer as `HttpTenantContext` (reads JWT claims via `IHttpContextAccessor`).
 
-**DTOs** in `DailyNotes.Application.DTOs`:
+**Request DTOs** in `DailyNotes.Application.DTOs.Requests`:
+- One `*Request` DTO per entity used for `POST` and `PUT` bodies (e.g., `WorkDayRequest`, `WorkNoteRequest`, `WorkTaskRequest`, etc.)
+- Controllers accept request DTOs — never raw domain entities — so clients cannot supply `TenantId`, `UserId`, `CreatedAt`, or `Id` in the request body.
+
+**Response/operation DTOs** in `DailyNotes.Application.DTOs`:
 - `QuizDetailDto` — quiz + questions + options
 - `QuizAttemptDetailDto` — attempt + answers
 - `QuizSubmissionDto` / `QuizAnswerDto` — submit payload
+
+**Exceptions** in `DailyNotes.Core.Exceptions`:
+- `DomainException(message, statusCode)` — thrown by services for expected failures (e.g., invalid input, not found). The global exception handler maps these directly to the specified HTTP status code rather than 500.
 
 ---
 
@@ -440,13 +453,14 @@ Contains all use-case logic. Services inherit `ApplicationServiceBase` which pro
 
 All endpoints except `/api/auth/*` require `[Authorize]` with a valid JWT Bearer token.
 
-**Cross-cutting configuration** (`Program.cs`):
+**Cross-cutting configuration** (`Program.cs` + `Api/Extensions/ServiceCollectionExtensions.cs`):
+- `AddInfrastructureServices` — DbContext, Identity, `IDailyNotesDataContext`, auth service, provider stubs, `TimeProvider.System`
+- `AddApplicationServices` — all 14 service interface → implementation registrations
+- `AddAuthConfiguration` — JWT Bearer validation parameters
+- `AddSwaggerConfiguration` — OpenAPI doc + Bearer security scheme
 - CORS for `localhost:5173` (Vite) and `localhost:4200`
-- JWT Bearer authentication + refresh token rotation
 - Rate limiting on auth endpoints (10 req/min)
-- Swagger/OpenAPI with Bearer scheme
-- Global exception handler middleware
-- `IHttpContextAccessor` registered for `HttpTenantContext`
+- Global exception handler: `DomainException` → its `StatusCode`; all others → 500
 
 ---
 
