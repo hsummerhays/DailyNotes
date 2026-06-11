@@ -1,3 +1,4 @@
+using DailyNotes.Application.DTOs.Requests;
 using DailyNotes.Application.Services;
 using DailyNotes.Core.Entities;
 using Microsoft.AspNetCore.Authorization;
@@ -41,26 +42,23 @@ namespace DailyNotes.Api.Controllers
         }
 
         /// <summary>Creates a new work note. Also ensures the corresponding work day record exists.</summary>
-        /// <param name="workNote">The work note data to be created.</param>
+        /// <param name="request">The work note data to be created.</param>
         [HttpPost]
-        public async Task<ActionResult<WorkNote>> Create(WorkNote workNote)
+        public async Task<ActionResult<WorkNote>> Create(WorkNoteRequest request)
         {
-            if (workNote.WorkTaskId == null)
+            if (request.WorkTaskId == null)
                 return BadRequest(new { message = "A linked task is required." });
 
-            var created = await _service.CreateAsync(workNote);
+            var created = await _service.CreateAsync(request);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
         /// <summary>Updates an existing work note.</summary>
         /// <param name="id">The ID of the note to update.</param>
-        /// <param name="workNote">The updated work note data.</param>
+        /// <param name="request">The updated work note data.</param>
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, WorkNote workNote)
-        {
-            if (id != workNote.Id) return BadRequest(new { message = "ID mismatch." });
-            return await _service.UpdateAsync(id, workNote) ? NoContent() : NotFound();
-        }
+        public async Task<IActionResult> Update(int id, WorkNoteRequest request)
+            => await _service.UpdateAsync(id, request) ? NoContent() : NotFound();
 
         /// <summary>Deletes a work note.</summary>
         /// <param name="id">The ID of the note to delete.</param>

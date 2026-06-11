@@ -1,17 +1,19 @@
+using DailyNotes.Application.Data;
 using DailyNotes.Core.Interfaces;
-using DailyNotes.Infrastructure.Data;
 
 namespace DailyNotes.Application.Services
 {
     public abstract class ApplicationServiceBase
     {
-        protected readonly DailyNotesDbContext _db;
+        protected readonly IDailyNotesDataContext _db;
         protected readonly ITenantContext _tc;
+        protected readonly TimeProvider _clock;
 
-        protected ApplicationServiceBase(DailyNotesDbContext db, ITenantContext tc)
+        protected ApplicationServiceBase(IDailyNotesDataContext db, ITenantContext tc, TimeProvider clock)
         {
             _db = db;
             _tc = tc;
+            _clock = clock;
         }
 
         protected IQueryable<T> TenantScoped<T>(IQueryable<T> query) where T : class, IHasTenantUser

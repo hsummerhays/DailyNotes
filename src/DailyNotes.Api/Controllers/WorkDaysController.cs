@@ -1,3 +1,4 @@
+using DailyNotes.Application.DTOs.Requests;
 using DailyNotes.Application.Services;
 using DailyNotes.Core.Entities;
 using Microsoft.AspNetCore.Authorization;
@@ -50,23 +51,20 @@ namespace DailyNotes.Api.Controllers
         }
 
         /// <summary>Creates a new work day record.</summary>
-        /// <param name="workDay">The work day data to be created.</param>
+        /// <param name="request">The work day data to be created.</param>
         [HttpPost]
-        public async Task<ActionResult<WorkDay>> Create(WorkDay workDay)
+        public async Task<ActionResult<WorkDay>> Create(WorkDayRequest request)
         {
-            var created = await _service.CreateAsync(workDay);
+            var created = await _service.CreateAsync(request);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
         /// <summary>Updates an existing work day record.</summary>
         /// <param name="id">The ID of the work day to update.</param>
-        /// <param name="workDay">The updated work day data.</param>
+        /// <param name="request">The updated work day data.</param>
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, WorkDay workDay)
-        {
-            if (id != workDay.Id) return BadRequest(new { message = "ID mismatch." });
-            return await _service.UpdateAsync(id, workDay) ? NoContent() : NotFound();
-        }
+        public async Task<IActionResult> Update(int id, WorkDayRequest request)
+            => await _service.UpdateAsync(id, request) ? NoContent() : NotFound();
 
         /// <summary>Deletes a work day record.</summary>
         /// <param name="id">The ID of the record to delete.</param>

@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using DailyNotes.Core.DTOs.Auth;
 using DailyNotes.Core.Entities;
+using DailyNotes.Core.Exceptions;
 using DailyNotes.Core.Interfaces;
 using DailyNotes.Infrastructure.Data;
 using Microsoft.AspNetCore.Identity;
@@ -46,7 +47,7 @@ namespace DailyNotes.Infrastructure.Services
             if (!result.Succeeded)
             {
                 var errors = string.Join(", ", result.Errors.Select(e => e.Description));
-                throw new Exception($"Registration failed: {errors}");
+                throw new DomainException($"Registration failed: {errors}");
             }
 
             // 2. Create Tenant
@@ -80,17 +81,17 @@ namespace DailyNotes.Infrastructure.Services
             // 1. Validate User
             var user = await _userManager.FindByEmailAsync(model.Email);
             if (user == null)
-                throw new Exception("Invalid email or password.");
+                throw new DomainException("Invalid email or password.", 401);
 
             if (!await _userManager.CheckPasswordAsync(user, model.Password))
-                throw new Exception("Invalid email or password.");
+                throw new DomainException("Invalid email or password.", 401);
 
             // 2. Get Tenant (Default to first one for now)
             var tenantUser = await _context.TenantUsers
                 .FirstOrDefaultAsync(tu => tu.UserId == user.Id);
 
             if (tenantUser == null)
-                throw new Exception("User is not associated with any tenant.");
+                throw new DomainException("User is not associated with any tenant.", 403);
 
             // 3. Generate Token
             return await GenerateAuthResponse(user, tenantUser.TenantId, tenantUser.Role);
@@ -105,19 +106,19 @@ namespace DailyNotes.Infrastructure.Services
                                        && t.Value == refreshToken);
 
             if (tokenRecord == null)
-                throw new Exception("Invalid refresh token.");
+                throw new DomainException("Invalid refresh token.", 401);
 
             var foundUser = await _userManager.FindByIdAsync(tokenRecord.UserId);
 
             if (foundUser == null)
-                throw new Exception("Invalid refresh token.");
+                throw new DomainException("Invalid refresh token.", 401);
 
             // Get tenant
             var tenantUser = await _context.TenantUsers
                 .FirstOrDefaultAsync(tu => tu.UserId == foundUser.Id);
 
             if (tenantUser == null)
-                throw new Exception("User is not associated with any tenant.");
+                throw new DomainException("User is not associated with any tenant.", 403);
 
             // Generate new tokens
             return await GenerateAuthResponse(foundUser, tenantUser.TenantId, tenantUser.Role);
@@ -125,7 +126,7 @@ namespace DailyNotes.Infrastructure.Services
 
         private async Task<AuthResult> GenerateAuthResponse(IdentityUser user, int tenantId, string role)
         {
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"] ?? throw new Exception("JWT Key not configured")));
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"] ?? throw new DomainException("JWT Key not configured", 500)));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
             var expiry = DateTime.UtcNow.AddHours(1);
 

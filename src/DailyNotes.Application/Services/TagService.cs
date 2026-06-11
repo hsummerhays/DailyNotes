@@ -1,12 +1,13 @@
+using DailyNotes.Application.Data;
+using DailyNotes.Application.DTOs.Requests;
 using DailyNotes.Core.Entities;
-using DailyNotes.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace DailyNotes.Application.Services
 {
     public class TagService : ApplicationServiceBase, ITagService
     {
-        public TagService(DailyNotesDbContext db, ITenantContext tc) : base(db, tc) { }
+        public TagService(IDailyNotesDataContext db, ITenantContext tc, TimeProvider clock) : base(db, tc, clock) { }
 
         public async Task<IEnumerable<Tag>> GetAllAsync()
             => await TenantOnlyScoped(_db.Tags).OrderBy(t => t.Name).ToListAsync();
@@ -14,21 +15,27 @@ namespace DailyNotes.Application.Services
         public async Task<Tag?> GetByIdAsync(int id)
             => await TenantOnlyScoped(_db.Tags).FirstOrDefaultAsync(t => t.Id == id);
 
-        public async Task<Tag> CreateAsync(Tag tag)
+        public async Task<Tag> CreateAsync(TagRequest request)
         {
-            tag.TenantId = _tc.TenantId;
+            var tag = new Tag
+            {
+                TenantId = _tc.TenantId,
+                Name = request.Name,
+                Color = request.Color
+            };
+
             _db.Tags.Add(tag);
             await _db.SaveChangesAsync();
             return tag;
         }
 
-        public async Task<bool> UpdateAsync(int id, Tag tag)
+        public async Task<bool> UpdateAsync(int id, TagRequest request)
         {
             var existing = await TenantOnlyScoped(_db.Tags).FirstOrDefaultAsync(t => t.Id == id);
             if (existing == null) return false;
 
-            existing.Name = tag.Name;
-            existing.Color = tag.Color;
+            existing.Name = request.Name;
+            existing.Color = request.Color;
 
             await _db.SaveChangesAsync();
             return true;

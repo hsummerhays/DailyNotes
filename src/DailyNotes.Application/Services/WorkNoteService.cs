@@ -1,15 +1,17 @@
+using DailyNotes.Application.Data;
+using DailyNotes.Application.DTOs.Requests;
 using DailyNotes.Core.Entities;
-using DailyNotes.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace DailyNotes.Application.Services
 {
     public class WorkNoteService : ApplicationServiceBase, IWorkNoteService
     {
-        public WorkNoteService(DailyNotesDbContext db, ITenantContext tc) : base(db, tc) { }
+        public WorkNoteService(IDailyNotesDataContext db, ITenantContext tc, TimeProvider clock) : base(db, tc, clock) { }
 
         public async Task<IEnumerable<WorkNote>> GetAllAsync(DateOnly? date, int? taskId, int page, int pageSize)
         {
+            pageSize = Math.Min(pageSize, 100);
             var query = TenantScoped(_db.WorkNotes).AsQueryable();
 
             if (date.HasValue) query = query.Where(n => n.NoteDate == date.Value);
@@ -26,12 +28,24 @@ namespace DailyNotes.Application.Services
         public async Task<WorkNote?> GetByIdAsync(int id)
             => await TenantScoped(_db.WorkNotes).FirstOrDefaultAsync(n => n.Id == id);
 
-        public async Task<WorkNote> CreateAsync(WorkNote workNote)
+        public async Task<WorkNote> CreateAsync(WorkNoteRequest request)
         {
-            workNote.TenantId = _tc.TenantId;
-            workNote.UserId = _tc.UserId;
-            workNote.CreatedAt = DateTime.UtcNow;
-            workNote.UpdatedAt = DateTime.UtcNow;
+            var now = _clock.GetUtcNow().UtcDateTime;
+            var workNote = new WorkNote
+            {
+                TenantId = _tc.TenantId,
+                UserId = _tc.UserId,
+                NoteDate = request.NoteDate,
+                Content = request.Content,
+                WorkTaskId = request.WorkTaskId,
+                TimeMinutes = request.TimeMinutes,
+                ExternalSource = request.ExternalSource,
+                ExternalId = request.ExternalId,
+                IsPinned = request.IsPinned,
+                Visibility = request.Visibility,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
 
             // work_notes has a FK on NoteDate → work_days.WorkDate; ensure the row exists first
             using var transaction = await _db.Database.BeginTransactionAsync();
@@ -48,8 +62,8 @@ namespace DailyNotes.Application.Services
                     TenantId = _tc.TenantId,
                     UserId = _tc.UserId,
                     WorkDate = workNote.NoteDate,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
+                    CreatedAt = now,
+                    UpdatedAt = now
                 });
                 await _db.SaveChangesAsync();
             }
@@ -61,20 +75,20 @@ namespace DailyNotes.Application.Services
             return workNote;
         }
 
-        public async Task<bool> UpdateAsync(int id, WorkNote workNote)
+        public async Task<bool> UpdateAsync(int id, WorkNoteRequest request)
         {
             var existing = await TenantScoped(_db.WorkNotes).FirstOrDefaultAsync(n => n.Id == id);
             if (existing == null) return false;
 
-            existing.WorkTaskId = workNote.WorkTaskId;
-            existing.NoteDate = workNote.NoteDate;
-            existing.Content = workNote.Content;
-            existing.TimeMinutes = workNote.TimeMinutes;
-            existing.ExternalSource = workNote.ExternalSource;
-            existing.ExternalId = workNote.ExternalId;
-            existing.IsPinned = workNote.IsPinned;
-            existing.Visibility = workNote.Visibility;
-            existing.UpdatedAt = DateTime.UtcNow;
+            existing.WorkTaskId = request.WorkTaskId;
+            existing.NoteDate = request.NoteDate;
+            existing.Content = request.Content;
+            existing.TimeMinutes = request.TimeMinutes;
+            existing.ExternalSource = request.ExternalSource;
+            existing.ExternalId = request.ExternalId;
+            existing.IsPinned = request.IsPinned;
+            existing.Visibility = request.Visibility;
+            existing.UpdatedAt = _clock.GetUtcNow().UtcDateTime;
 
             await _db.SaveChangesAsync();
             return true;

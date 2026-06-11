@@ -1,12 +1,13 @@
+using DailyNotes.Application.Data;
+using DailyNotes.Application.DTOs.Requests;
 using DailyNotes.Core.Entities;
-using DailyNotes.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace DailyNotes.Application.Services
 {
     public class PayPeriodService : ApplicationServiceBase, IPayPeriodService
     {
-        public PayPeriodService(DailyNotesDbContext db, ITenantContext tc) : base(db, tc) { }
+        public PayPeriodService(IDailyNotesDataContext db, ITenantContext tc, TimeProvider clock) : base(db, tc, clock) { }
 
         public async Task<IEnumerable<PayPeriod>> GetAllAsync(DateOnly? date)
         {
@@ -32,27 +33,35 @@ namespace DailyNotes.Application.Services
                 .ToListAsync();
         }
 
-        public async Task<PayPeriod> CreateAsync(PayPeriod payPeriod)
+        public async Task<PayPeriod> CreateAsync(PayPeriodRequest request)
         {
-            payPeriod.TenantId = _tc.TenantId;
-            payPeriod.UserId = _tc.UserId;
-            payPeriod.CreatedAt = DateTime.UtcNow;
+            var payPeriod = new PayPeriod
+            {
+                TenantId = _tc.TenantId,
+                UserId = _tc.UserId,
+                PeriodStartDate = request.PeriodStartDate,
+                PeriodEndDate = request.PeriodEndDate,
+                Holidays = request.Holidays,
+                PtoReported = request.PtoReported,
+                PtoDaysOfMonth = request.PtoDaysOfMonth,
+                CreatedAt = _clock.GetUtcNow().UtcDateTime
+            };
 
             _db.PayPeriods.Add(payPeriod);
             await _db.SaveChangesAsync();
             return payPeriod;
         }
 
-        public async Task<bool> UpdateAsync(int id, PayPeriod payPeriod)
+        public async Task<bool> UpdateAsync(int id, PayPeriodRequest request)
         {
             var existing = await TenantScoped(_db.PayPeriods).FirstOrDefaultAsync(p => p.Id == id);
             if (existing == null) return false;
 
-            existing.PeriodStartDate = payPeriod.PeriodStartDate;
-            existing.PeriodEndDate = payPeriod.PeriodEndDate;
-            existing.Holidays = payPeriod.Holidays;
-            existing.PtoReported = payPeriod.PtoReported;
-            existing.PtoDaysOfMonth = payPeriod.PtoDaysOfMonth;
+            existing.PeriodStartDate = request.PeriodStartDate;
+            existing.PeriodEndDate = request.PeriodEndDate;
+            existing.Holidays = request.Holidays;
+            existing.PtoReported = request.PtoReported;
+            existing.PtoDaysOfMonth = request.PtoDaysOfMonth;
 
             await _db.SaveChangesAsync();
             return true;

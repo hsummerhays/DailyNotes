@@ -1,3 +1,4 @@
+using DailyNotes.Application.DTOs.Requests;
 using DailyNotes.Application.Services;
 using DailyNotes.Core.Entities;
 using Microsoft.AspNetCore.Authorization;
@@ -44,23 +45,20 @@ namespace DailyNotes.Api.Controllers
         }
 
         /// <summary>Creates a new pay period record.</summary>
-        /// <param name="payPeriod">The pay period data to be created.</param>
+        /// <param name="request">The pay period data to be created.</param>
         [HttpPost]
-        public async Task<ActionResult<PayPeriod>> Create(PayPeriod payPeriod)
+        public async Task<ActionResult<PayPeriod>> Create(PayPeriodRequest request)
         {
-            var created = await _service.CreateAsync(payPeriod);
+            var created = await _service.CreateAsync(request);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
         /// <summary>Updates an existing pay period record.</summary>
         /// <param name="id">The ID of the pay period to update.</param>
-        /// <param name="payPeriod">The updated pay period data.</param>
+        /// <param name="request">The updated pay period data.</param>
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, PayPeriod payPeriod)
-        {
-            if (id != payPeriod.Id) return BadRequest(new { message = "ID mismatch." });
-            return await _service.UpdateAsync(id, payPeriod) ? NoContent() : NotFound();
-        }
+        public async Task<IActionResult> Update(int id, PayPeriodRequest request)
+            => await _service.UpdateAsync(id, request) ? NoContent() : NotFound();
 
         /// <summary>Deletes a pay period record.</summary>
         /// <param name="id">The ID of the pay period to delete.</param>

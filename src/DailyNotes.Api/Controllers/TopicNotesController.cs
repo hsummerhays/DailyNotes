@@ -1,3 +1,4 @@
+using DailyNotes.Application.DTOs.Requests;
 using DailyNotes.Application.Services;
 using DailyNotes.Core.Entities;
 using Microsoft.AspNetCore.Authorization;
@@ -37,23 +38,20 @@ namespace DailyNotes.Api.Controllers
         }
 
         /// <summary>Creates a new topic note.</summary>
-        /// <param name="topicNote">The note to be created.</param>
+        /// <param name="request">The note to be created.</param>
         [HttpPost]
-        public async Task<ActionResult<TopicNote>> Create(TopicNote topicNote)
+        public async Task<ActionResult<TopicNote>> Create(TopicNoteRequest request)
         {
-            var created = await _service.CreateAsync(topicNote);
+            var created = await _service.CreateAsync(request);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
         /// <summary>Updates an existing topic note.</summary>
         /// <param name="id">The ID of the note to update.</param>
-        /// <param name="topicNote">The updated note content.</param>
+        /// <param name="request">The updated note content.</param>
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, TopicNote topicNote)
-        {
-            if (id != topicNote.Id) return BadRequest(new { message = "ID mismatch." });
-            return await _service.UpdateAsync(id, topicNote) ? NoContent() : NotFound();
-        }
+        public async Task<IActionResult> Update(int id, TopicNoteRequest request)
+            => await _service.UpdateAsync(id, request) ? NoContent() : NotFound();
 
         /// <summary>Deletes a topic note.</summary>
         /// <param name="id">The ID of the note to delete.</param>

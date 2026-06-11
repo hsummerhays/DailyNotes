@@ -1,3 +1,4 @@
+using DailyNotes.Application.DTOs.Requests;
 using DailyNotes.Application.Services;
 using DailyNotes.Core.Entities;
 using Microsoft.AspNetCore.Authorization;
@@ -39,23 +40,20 @@ namespace DailyNotes.Api.Controllers
         }
 
         /// <summary>Creates a new assignment.</summary>
-        /// <param name="assignment">The assignment data to be created.</param>
+        /// <param name="request">The assignment data to be created.</param>
         [HttpPost]
-        public async Task<ActionResult<Assignment>> Create(Assignment assignment)
+        public async Task<ActionResult<Assignment>> Create(AssignmentRequest request)
         {
-            var created = await _service.CreateAsync(assignment);
+            var created = await _service.CreateAsync(request);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
         /// <summary>Updates an existing assignment record.</summary>
         /// <param name="id">The ID of the assignment to update.</param>
-        /// <param name="assignment">The updated assignment data.</param>
+        /// <param name="request">The updated assignment data.</param>
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, Assignment assignment)
-        {
-            if (id != assignment.Id) return BadRequest(new { message = "ID mismatch." });
-            return await _service.UpdateAsync(id, assignment) ? NoContent() : NotFound();
-        }
+        public async Task<IActionResult> Update(int id, AssignmentRequest request)
+            => await _service.UpdateAsync(id, request) ? NoContent() : NotFound();
 
         /// <summary>Deletes an assignment record.</summary>
         /// <param name="id">The ID of the assignment to delete.</param>

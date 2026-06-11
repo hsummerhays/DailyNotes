@@ -1,3 +1,4 @@
+using DailyNotes.Application.DTOs.Requests;
 using DailyNotes.Application.Services;
 using DailyNotes.Core.Entities;
 using Microsoft.AspNetCore.Authorization;
@@ -37,11 +38,11 @@ namespace DailyNotes.Api.Controllers
         }
 
         /// <summary>Creates a new attachment record (metadata only). File upload should be handled by a storage provider.</summary>
-        /// <param name="attachment">The attachment data to be created.</param>
+        /// <param name="request">The attachment data to be created.</param>
         [HttpPost]
-        public async Task<ActionResult<Attachment>> Create(Attachment attachment)
+        public async Task<ActionResult<Attachment>> Create(AttachmentRequest request)
         {
-            var created = await _service.CreateAsync(attachment);
+            var created = await _service.CreateAsync(request);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 

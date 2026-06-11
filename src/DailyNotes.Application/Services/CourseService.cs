@@ -1,12 +1,13 @@
+using DailyNotes.Application.Data;
+using DailyNotes.Application.DTOs.Requests;
 using DailyNotes.Core.Entities;
-using DailyNotes.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace DailyNotes.Application.Services
 {
     public class CourseService : ApplicationServiceBase, ICourseService
     {
-        public CourseService(DailyNotesDbContext db, ITenantContext tc) : base(db, tc) { }
+        public CourseService(IDailyNotesDataContext db, ITenantContext tc, TimeProvider clock) : base(db, tc, clock) { }
 
         public async Task<IEnumerable<Course>> GetAllAsync(string? semester)
         {
@@ -20,35 +21,52 @@ namespace DailyNotes.Application.Services
                 .Include(c => c.Assignments)
                 .FirstOrDefaultAsync(c => c.Id == id);
 
-        public async Task<Course> CreateAsync(Course course)
+        public async Task<Course> CreateAsync(CourseRequest request)
         {
-            course.TenantId = _tc.TenantId;
-            course.UserId = _tc.UserId;
-            course.CreatedAt = DateTime.UtcNow;
-            course.UpdatedAt = DateTime.UtcNow;
+            var now = _clock.GetUtcNow().UtcDateTime;
+            var course = new Course
+            {
+                TenantId = _tc.TenantId,
+                UserId = _tc.UserId,
+                Semester = request.Semester,
+                Name = request.Name,
+                Instructor = request.Instructor,
+                Description = request.Description,
+                Credits = request.Credits,
+                TargetGrade = request.TargetGrade,
+                CurrentGrade = request.CurrentGrade,
+                ExternalSource = request.ExternalSource,
+                ExternalId = request.ExternalId,
+                ExternalUrl = request.ExternalUrl,
+                ProgressPercent = request.ProgressPercent,
+                TopicId = request.TopicId,
+                IsPinned = request.IsPinned,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
 
             _db.Courses.Add(course);
             await _db.SaveChangesAsync();
             return course;
         }
 
-        public async Task<bool> UpdateAsync(int id, Course course)
+        public async Task<bool> UpdateAsync(int id, CourseRequest request)
         {
             var existing = await TenantScoped(_db.Courses).FirstOrDefaultAsync(c => c.Id == id);
             if (existing == null) return false;
 
-            existing.Name = course.Name;
-            existing.Instructor = course.Instructor;
-            existing.Semester = course.Semester;
-            existing.Credits = course.Credits;
-            existing.CurrentGrade = course.CurrentGrade;
-            existing.ExternalSource = course.ExternalSource;
-            existing.ExternalId = course.ExternalId;
-            existing.ExternalUrl = course.ExternalUrl;
-            existing.ProgressPercent = course.ProgressPercent;
-            existing.TopicId = course.TopicId;
-            existing.IsPinned = course.IsPinned;
-            existing.UpdatedAt = DateTime.UtcNow;
+            existing.Name = request.Name;
+            existing.Instructor = request.Instructor;
+            existing.Semester = request.Semester;
+            existing.Credits = request.Credits;
+            existing.CurrentGrade = request.CurrentGrade;
+            existing.ExternalSource = request.ExternalSource;
+            existing.ExternalId = request.ExternalId;
+            existing.ExternalUrl = request.ExternalUrl;
+            existing.ProgressPercent = request.ProgressPercent;
+            existing.TopicId = request.TopicId;
+            existing.IsPinned = request.IsPinned;
+            existing.UpdatedAt = _clock.GetUtcNow().UtcDateTime;
 
             await _db.SaveChangesAsync();
             return true;
