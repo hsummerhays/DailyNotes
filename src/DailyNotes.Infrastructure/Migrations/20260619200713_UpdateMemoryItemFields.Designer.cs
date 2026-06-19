@@ -5,6 +5,7 @@ using System.Text.Json;
 using DailyNotes.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Pgvector;
@@ -14,9 +15,11 @@ using Pgvector;
 namespace DailyNotes.Infrastructure.Migrations
 {
     [DbContext(typeof(DailyNotesDbContext))]
-    partial class DailyNotesDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260619200713_UpdateMemoryItemFields")]
+    partial class UpdateMemoryItemFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -343,9 +346,7 @@ namespace DailyNotes.Infrastructure.Migrations
 
                     b.Property<string>("MemoryStatus")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("Active");
+                        .HasColumnType("text");
 
                     b.Property<string>("MemoryType")
                         .IsRequired()

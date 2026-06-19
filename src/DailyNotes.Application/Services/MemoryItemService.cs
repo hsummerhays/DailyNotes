@@ -34,11 +34,13 @@ namespace DailyNotes.Application.Services
                 TenantId = _tc.TenantId,
                 UserId = _tc.UserId,
                 MemoryType = request.MemoryType,
+                MemoryStatus = request.MemoryStatus,
                 Summary = request.Summary,
                 Embedding = request.Embedding,
                 ImportanceScore = request.ImportanceScore,
                 CreatedAt = now,
                 LastAccessedAt = now,
+                LastConfirmedAt = request.LastConfirmedAt,
                 RelatedMemoryId = request.RelatedMemoryId,
                 SourceEntityType = request.SourceEntityType,
                 SourceEntityId = request.SourceEntityId
@@ -57,10 +59,12 @@ namespace DailyNotes.Application.Services
             if (existing == null) return false;
 
             existing.MemoryType = request.MemoryType;
+            existing.MemoryStatus = request.MemoryStatus;
             existing.Summary = request.Summary;
             existing.Embedding = request.Embedding;
             existing.ImportanceScore = request.ImportanceScore;
             existing.LastAccessedAt = _clock.GetUtcNow().UtcDateTime;
+            existing.LastConfirmedAt = request.LastConfirmedAt;
             existing.RelatedMemoryId = request.RelatedMemoryId;
             existing.SourceEntityType = request.SourceEntityType;
             existing.SourceEntityId = request.SourceEntityId;
@@ -83,6 +87,7 @@ namespace DailyNotes.Application.Services
             float[] queryEmbedding,
             double minImportanceScore = 0.0,
             string? memoryType = null,
+            string? memoryStatus = "Active",
             int limit = 5)
         {
             if (queryEmbedding == null || queryEmbedding.Length == 0)
@@ -107,6 +112,11 @@ namespace DailyNotes.Application.Services
                 if (!string.IsNullOrEmpty(memoryType))
                 {
                     query = query.Where(m => m.MemoryType == memoryType);
+                }
+
+                if (!string.IsNullOrEmpty(memoryStatus))
+                {
+                    query = query.Where(m => m.MemoryStatus == memoryStatus);
                 }
 
                 items = await query.ToListAsync();
@@ -135,6 +145,12 @@ namespace DailyNotes.Application.Services
                     parameters.Add(memoryType);
                 }
 
+                if (!string.IsNullOrEmpty(memoryStatus))
+                {
+                    sql += $" AND memory_status = {{{paramIndex++}}}";
+                    parameters.Add(memoryStatus);
+                }
+
                 sql += $" ORDER BY embedding <=> {{{paramIndex++}}} LIMIT {{{paramIndex}}}";
                 parameters.Add(new Vector(queryEmbedding));
                 parameters.Add(limitCandidates);
@@ -146,6 +162,7 @@ namespace DailyNotes.Application.Services
 
             // Re-rank items using the composite score formula:
             // score = semantic_similarity * 0.6 + importance_score * 0.2 + recency_score * 0.2
+            // Boost importance by frequency of access: recalled memories rank higher.
             var results = items
                 .Select(item =>
                 {
@@ -154,7 +171,11 @@ namespace DailyNotes.Application.Services
                     if (daysSinceAccess < 0) daysSinceAccess = 0; // clock skew safety
                     double recencyScore = 1.0 / (1.0 + daysSinceAccess);
 
-                    double compositeScore = (similarity * 0.6) + (item.ImportanceScore * 0.2) + (recencyScore * 0.2);
+                    // access count boost (up to +100% boost to importance_score for 100+ recalls)
+                    double accessBoost = 1.0 + (Math.Min(item.AccessCount, 100) / 100.0);
+                    double boostedImportance = Math.Min(item.ImportanceScore * accessBoost, 1.0);
+
+                    double compositeScore = (similarity * 0.6) + (boostedImportance * 0.2) + (recencyScore * 0.2);
 
                     return new
                     {
@@ -167,11 +188,12 @@ namespace DailyNotes.Application.Services
                 .Select(r =>
                 {
                     r.Item.LastAccessedAt = now;
+                    r.Item.AccessCount++;
                     return r.Item;
                 })
                 .ToList();
 
-            // Save the updated access times
+            // Save the updated access times and counts
             if (results.Any())
             {
                 await _db.SaveChangesAsync();

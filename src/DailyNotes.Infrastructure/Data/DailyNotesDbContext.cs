@@ -155,6 +155,7 @@ namespace DailyNotes.Infrastructure.Data
             builder.Entity<MemoryItem>().ToTable("memory_items");
             builder.Entity<MemoryItem>().HasIndex(m => m.TenantId);
             builder.Entity<MemoryItem>().HasIndex(m => new { m.TenantId, m.UserId });
+            builder.Entity<MemoryItem>().Property(m => m.MemoryStatus).HasDefaultValue("Active");
 
             if (Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory" || Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite")
             {

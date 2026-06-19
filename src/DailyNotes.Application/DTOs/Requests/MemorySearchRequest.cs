@@ -11,6 +11,8 @@ namespace DailyNotes.Application.DTOs.Requests
         public double MinImportanceScore { get; set; } = 0.0;
         [MaxLength(50)]
         public string? MemoryType { get; set; }
+        [MaxLength(50)]
+        public string MemoryStatus { get; set; } = "Active"; // Default to Active to exclude archived/superseded memories
         [Range(1, 50)]
         public int Limit { get; set; } = 5;
     }

@@ -66,6 +66,7 @@ namespace DailyNotes.Api.Controllers
                 request.QueryEmbedding,
                 request.MinImportanceScore,
                 request.MemoryType,
+                request.MemoryStatus,
                 request.Limit);
             return Ok(results);
         }

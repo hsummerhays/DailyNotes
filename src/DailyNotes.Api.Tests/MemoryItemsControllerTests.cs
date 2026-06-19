@@ -43,11 +43,12 @@ namespace DailyNotes.Api.Tests
             var payload1 = new
             {
                 memoryType = "Learning",
+                memoryStatus = "Active",
                 summary = "React 19 upgrades and Zustand state management pattern",
                 embedding = new float[1536], // Using a 1536-dimensional mock embedding vector
                 importanceScore = 0.8,
                 sourceEntityType = "Note",
-                sourceEntityId = "42"
+                sourceEntityId = 42
             };
             payload1.embedding[0] = 0.1f;
             payload1.embedding[1] = 0.2f;
@@ -60,9 +61,11 @@ namespace DailyNotes.Api.Tests
 
             var createdItem = JsonDocument.Parse(await resp1.Content.ReadAsStringAsync()).RootElement;
             Assert.Equal("Learning", createdItem.GetProperty("memoryType").GetString());
+            Assert.Equal("Active", createdItem.GetProperty("memoryStatus").GetString());
             Assert.Equal(0.8, createdItem.GetProperty("importanceScore").GetDouble());
             Assert.Equal("Note", createdItem.GetProperty("sourceEntityType").GetString());
-            Assert.Equal("42", createdItem.GetProperty("sourceEntityId").GetString());
+            Assert.Equal(42, createdItem.GetProperty("sourceEntityId").GetInt32());
+            Assert.Equal(0, createdItem.GetProperty("accessCount").GetInt32());
 
             var createdId = createdItem.GetProperty("id").GetInt32();
 
@@ -70,6 +73,7 @@ namespace DailyNotes.Api.Tests
             var payload2 = new
             {
                 memoryType = "Goal",
+                memoryStatus = "Active",
                 summary = "Master advanced frontend state management",
                 embedding = new float[1536],
                 importanceScore = 0.9,
@@ -98,6 +102,7 @@ namespace DailyNotes.Api.Tests
             {
                 queryEmbedding = searchEmbedding,
                 minImportanceScore = 0.5,
+                memoryStatus = "Active",
                 limit = 2
             };
             var searchContent = new StringContent(JsonSerializer.Serialize(searchPayload), Encoding.UTF8, "application/json");
@@ -107,6 +112,12 @@ namespace DailyNotes.Api.Tests
             var searchResults = JsonDocument.Parse(await searchResp.Content.ReadAsStringAsync()).RootElement;
             Assert.Equal(JsonValueKind.Array, searchResults.ValueKind);
             Assert.True(searchResults.GetArrayLength() > 0);
+
+            // Fetch memory 1 again to verify access count incremented
+            var getResp = await client.GetAsync($"/api/memory-items/{createdId}");
+            getResp.EnsureSuccessStatusCode();
+            var fetchedItem = JsonDocument.Parse(await getResp.Content.ReadAsStringAsync()).RootElement;
+            Assert.True(fetchedItem.GetProperty("accessCount").GetInt32() > 0);
         }
 
         [Fact]
