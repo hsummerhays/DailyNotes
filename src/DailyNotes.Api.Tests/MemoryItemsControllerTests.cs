@@ -145,5 +145,54 @@ namespace DailyNotes.Api.Tests
 
             Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
         }
+
+        [Fact]
+        public async Task Search_WithMinConfidenceScore_ExcludesLowConfidenceMemories()
+        {
+            var client = _factory.CreateClient();
+            client.DefaultRequestHeaders.Add("X-User-Id", "user-a");
+            client.DefaultRequestHeaders.Add("X-Tenant-Id", "1");
+
+            var embedding = new float[1536];
+            embedding[0] = 0.5f;
+
+            var lowConfidencePayload = new
+            {
+                memoryType = "Fact",
+                summary = "A guess with low confidence",
+                embedding,
+                importanceScore = 0.9,
+                confidenceScore = 0.1
+            };
+            var highConfidencePayload = new
+            {
+                memoryType = "Fact",
+                summary = "A well-established fact",
+                embedding,
+                importanceScore = 0.9,
+                confidenceScore = 0.9
+            };
+
+            foreach (var payload in new object[] { lowConfidencePayload, highConfidencePayload })
+            {
+                var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+                var resp = await client.PostAsync("/api/memory-items", content);
+                resp.EnsureSuccessStatusCode();
+            }
+
+            var searchPayload = new
+            {
+                queryEmbedding = embedding,
+                minConfidenceScore = 0.5,
+                limit = 10
+            };
+            var searchContent = new StringContent(JsonSerializer.Serialize(searchPayload), Encoding.UTF8, "application/json");
+            var searchResp = await client.PostAsync("/api/memory-items/search", searchContent);
+            searchResp.EnsureSuccessStatusCode();
+
+            var results = JsonDocument.Parse(await searchResp.Content.ReadAsStringAsync()).RootElement;
+            Assert.True(results.GetArrayLength() > 0);
+            Assert.All(results.EnumerateArray(), item => Assert.True(item.GetProperty("confidenceScore").GetDouble() >= 0.5));
+        }
     }
 }

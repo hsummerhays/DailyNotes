@@ -16,7 +16,7 @@
 | **Transaction management** | `WorkNoteService.CreateAsync` (WorkDay auto-create) and `QuizAttemptService.SubmitAsync` (scoring) wrapped in DB transactions |
 | **TopicNote security fix** | `GET /api/topics/{id}/notes` now correctly scopes TopicNotes by tenant + user |
 | **Program.cs extension methods** | DI registration split into `AddApplicationServices`, `AddInfrastructureServices`, `AddAuthConfiguration`, `AddSwaggerConfiguration` |
-| **Vector Memory (pgvector)** | Added `MemoryItem` with native `pgvector(1536)` database support, hybrid retrieval composite scoring (semantic, recency, importance, access-frequency boost), formalized memory statuses (Active/Superseded/Archived/Incorrect), and graph linkages (`RelatedMemoryId`, integer source linkages). |
+| **Vector Memory (pgvector)** | Added `MemoryItem` with native `pgvector(1536)` database support, 6-factor hybrid retrieval composite scoring (semantic 40%, importance 20%, access-frequency 15%, recency 10%, confidence 10%, human-confirmation 5%), formalized memory statuses (Active/Superseded/Archived/Incorrect), and graph linkages (`RelatedMemoryId`, integer source linkages). |
 
 ---
 
@@ -108,6 +108,7 @@
 | **Rate limiting expansion** | Currently only auth endpoints are rate-limited; extend to all write endpoints to prevent abuse |
 | **Response caching** | Add `IMemoryCache` or Redis for frequently-read, rarely-changing data (tags list, topics tree, quiz questions) |
 | **Idempotency keys** | Accept `Idempotency-Key` header on POST endpoints; replay cached responses for duplicate requests |
+| **Embedding model versioning** | Add `EmbeddingModel`, `EmbeddingVersion`, `ReindexedAt` to `MemoryItem` — embedding dimension and provider (`text-embedding-3-small`, `voyage-large`, etc.) will change over time; without tracking which model produced a given vector, a model swap means silently-broken similarity comparisons instead of a clean re-index path |
 
 ## Additional Core Features
 

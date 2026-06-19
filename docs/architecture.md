@@ -93,6 +93,18 @@ Class library containing entities, DTOs, and interfaces — no external dependen
 
 **Visibility** values: `private` (default) → `tenant` (all tenant members) → `custom` (specific users via `shared_items`)
 
+**MemoryItem Trust Signals**
+
+`ConfidenceScore` represents the system's confidence that a memory is accurate (0.0–1.0).
+
+`LastConfirmedAt` records explicit human verification of a memory.
+
+`ConfidenceScore` and `LastConfirmedAt` are intentionally separate. A memory may have high model confidence without user confirmation, or vice versa.
+
+`SourceExcerpt` stores the specific text that produced the memory, allowing explainable recall and auditability.
+
+`MemoryStatus` tracks the memory lifecycle: `Active`, `Superseded`, `Archived`, or `Incorrect`.
+
 ---
 
 ## 2. Infrastructure Layer

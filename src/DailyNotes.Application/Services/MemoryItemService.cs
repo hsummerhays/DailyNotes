@@ -1,7 +1,9 @@
 using DailyNotes.Application.Data;
 using DailyNotes.Application.DTOs.Requests;
 using DailyNotes.Core.Entities;
+using DailyNotes.Core.Exceptions;
 using Microsoft.EntityFrameworkCore;
+using Pgvector;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,6 +26,8 @@ namespace DailyNotes.Application.Services
 
         public async Task<MemoryItem> CreateAsync(MemoryItemRequest request)
         {
+            ValidateEmbeddingDimensions(request.Embedding);
+
             var now = _clock.GetUtcNow().UtcDateTime;
             var item = new MemoryItem
             {
@@ -35,7 +39,6 @@ namespace DailyNotes.Application.Services
                 Embedding = request.Embedding,
                 ImportanceScore = request.ImportanceScore,
                 ConfidenceScore = request.ConfidenceScore,
-                AccessCount = request.AccessCount,
                 CreatedAt = now,
                 LastAccessedAt = now,
                 LastConfirmedAt = request.LastConfirmedAt,
@@ -52,6 +55,8 @@ namespace DailyNotes.Application.Services
 
         public async Task<bool> UpdateAsync(int id, MemoryItemRequest request)
         {
+            ValidateEmbeddingDimensions(request.Embedding);
+
             var existing = await TenantScoped(_db.MemoryItems).FirstOrDefaultAsync(m => m.Id == id);
             if (existing == null) return false;
 
@@ -61,7 +66,6 @@ namespace DailyNotes.Application.Services
             existing.Embedding = request.Embedding;
             existing.ImportanceScore = request.ImportanceScore;
             existing.ConfidenceScore = request.ConfidenceScore;
-            existing.AccessCount = request.AccessCount;
             existing.LastAccessedAt = _clock.GetUtcNow().UtcDateTime;
             existing.LastConfirmedAt = request.LastConfirmedAt;
             existing.RelatedMemoryId = request.RelatedMemoryId;
@@ -86,6 +90,7 @@ namespace DailyNotes.Application.Services
         public async Task<IEnumerable<MemoryItem>> SearchAsync(
             float[] queryEmbedding,
             double minImportanceScore = 0.0,
+            double minConfidenceScore = 0.0,
             string? memoryType = null,
             string? memoryStatus = "Active",
             int limit = 5)
@@ -94,6 +99,8 @@ namespace DailyNotes.Application.Services
             {
                 return Array.Empty<MemoryItem>();
             }
+
+            ValidateEmbeddingDimensions(queryEmbedding);
 
             List<MemoryItem> items;
 
@@ -105,6 +112,11 @@ namespace DailyNotes.Application.Services
                 if (minImportanceScore > 0.0)
                 {
                     query = query.Where(m => m.ImportanceScore >= minImportanceScore);
+                }
+
+                if (minConfidenceScore > 0.0)
+                {
+                    query = query.Where(m => m.ConfidenceScore >= minConfidenceScore);
                 }
 
                 if (!string.IsNullOrEmpty(memoryType))
@@ -137,6 +149,12 @@ namespace DailyNotes.Application.Services
                     parameters.Add(minImportanceScore);
                 }
 
+                if (minConfidenceScore > 0.0)
+                {
+                    sql += $" AND confidence_score >= {{{paramIndex++}}}";
+                    parameters.Add(minConfidenceScore);
+                }
+
                 if (!string.IsNullOrEmpty(memoryType))
                 {
                     sql += $" AND memory_type = {{{paramIndex++}}}";
@@ -150,7 +168,7 @@ namespace DailyNotes.Application.Services
                 }
 
                 sql += $" ORDER BY embedding <=> {{{paramIndex++}}} LIMIT {{{paramIndex}}}";
-                parameters.Add(queryEmbedding);
+                parameters.Add(new Vector(queryEmbedding));
                 parameters.Add(limitCandidates);
 
                 items = await _db.MemoryItems.FromSqlRaw(sql, parameters.ToArray()).ToListAsync();
@@ -159,11 +177,12 @@ namespace DailyNotes.Application.Services
             var now = _clock.GetUtcNow().UtcDateTime;
 
             // Re-rank items using the hybrid composite score formula:
-            // FinalScore = 50% Semantic Similarity
+            // FinalScore = 40% Semantic Similarity
             //            + 20% Importance
             //            + 15% Access Count
             //            + 10% Recency
-            //            + 5% Confirmation
+            //            + 10% Confidence (system's trust that the memory is correct)
+            //            +  5% Confirmation (human has explicitly confirmed it's still accurate)
             var results = items
                 .Select(item =>
                 {
@@ -175,10 +194,11 @@ namespace DailyNotes.Application.Services
                     double accessScore = 1.0 - (1.0 / (1.0 + item.AccessCount));
                     double confirmationScore = item.LastConfirmedAt.HasValue ? 1.0 : 0.0;
 
-                    double compositeScore = (similarity * 0.50) 
-                                          + (item.ImportanceScore * 0.20) 
-                                          + (accessScore * 0.15) 
-                                          + (recencyScore * 0.10) 
+                    double compositeScore = (similarity * 0.40)
+                                          + (item.ImportanceScore * 0.20)
+                                          + (accessScore * 0.15)
+                                          + (recencyScore * 0.10)
+                                          + (item.ConfidenceScore * 0.10)
                                           + (confirmationScore * 0.05);
 
                     return new
@@ -204,6 +224,15 @@ namespace DailyNotes.Application.Services
             }
 
             return results;
+        }
+
+        private static void ValidateEmbeddingDimensions(float[] embedding)
+        {
+            if (embedding.Length != MemoryItem.EmbeddingDimensions)
+            {
+                throw new DomainException(
+                    $"Embedding must contain exactly {MemoryItem.EmbeddingDimensions} dimensions, but received {embedding.Length}.");
+            }
         }
 
         private static double CosineSimilarity(float[] vectorA, float[] vectorB)
