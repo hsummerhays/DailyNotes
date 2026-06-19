@@ -75,6 +75,7 @@ Class library containing entities, DTOs, and interfaces — no external dependen
 | `QuizAnswer` | AttemptId, QuestionId, SelectedOptionId, IsCorrect (composite PK) |
 | `Course` | Id, TenantId, UserId, Name, Instructor, Semester, Credits, ExternalSource, ExternalId, ProgressPercent, TopicId |
 | `Assignment` | Id, CourseId, TenantId, UserId, Title, DueDate, Grade, Weight, Status |
+| `MemoryItem` | Id, TenantId, UserId, MemoryType, Summary, Embedding (float[]), ImportanceScore, CreatedAt, LastAccessedAt, RelatedMemoryId, SourceEntityType, SourceEntityId |
 
 **Interfaces:**
 
@@ -371,6 +372,23 @@ CREATE TABLE assignments (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX ix_assignments_course_id ON assignments(course_id);
+
+CREATE TABLE memory_items (
+    id              SERIAL PRIMARY KEY,
+    tenant_id       INT NOT NULL REFERENCES tenants(id),
+    user_id         TEXT NOT NULL,
+    memory_type     VARCHAR(50) NOT NULL,
+    summary         TEXT NOT NULL,
+    embedding       vector(1536) NOT NULL,
+    importance_score DOUBLE PRECISION NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_accessed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    related_memory_id INT REFERENCES memory_items(id) ON DELETE SET NULL,
+    source_entity_type VARCHAR(50),
+    source_entity_id   VARCHAR(255)
+);
+CREATE INDEX ix_memory_items_tenant_id ON memory_items(tenant_id);
+CREATE INDEX ix_memory_items_tenant_user ON memory_items(tenant_id, user_id);
 ```
 
 ---
@@ -449,6 +467,7 @@ Contains all use-case logic. Services inherit `ApplicationServiceBase` which pro
 | **PayPeriods** | Full CRUD (`?date=`) + `GET /{id}/work-days` |
 | **Quizzes** | Full CRUD (`?topicId=&difficulty=`) + `POST /{quizId}/questions` + `POST /questions/{questionId}/options` |
 | **QuizAttempts** | `GET /api/quiz-attempts?quizId=`, `GET /{id}`, `POST` (submit) |
+| **MemoryItems** | Full CRUD + `POST /search` |
 | **Search** | `GET /api/search?q=&type=&dateFrom=&dateTo=&projectId=&statuses=` |
 
 All endpoints except `/api/auth/*` require `[Authorize]` with a valid JWT Bearer token.

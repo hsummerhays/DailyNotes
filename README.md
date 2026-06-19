@@ -103,7 +103,7 @@ docker-compose.yml      # Local dev stack
 ```
 
 > [!WARNING]
-> The default `docker-compose.yml` uses `password` as the PostgreSQL password. Change it before any real deployment. See [Environment Setup Guide](docs/Environment_Setup_Guide.md).
+> The default `docker-compose.yml` uses `password` as the PostgreSQL password. Change it before any real deployment.
 
 ## Future Improvements
 
@@ -126,6 +126,5 @@ See the full [roadmap](docs/roadmap.md) for the complete backlog including third
 
 ## Documentation
 
-- [Environment Setup Guide](docs/Environment_Setup_Guide.md)
 - [Architecture & Implementation Plan](docs/architecture.md)
 - [Future Roadmap](docs/roadmap.md)

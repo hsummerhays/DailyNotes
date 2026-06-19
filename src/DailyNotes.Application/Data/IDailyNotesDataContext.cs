@@ -30,6 +30,7 @@ namespace DailyNotes.Application.Data
         DbSet<WebhookEvent> WebhookEvents { get; }
         DbSet<ApiKey> ApiKeys { get; }
         DbSet<WebhookSubscription> WebhookSubscriptions { get; }
+        DbSet<MemoryItem> MemoryItems { get; }
 
         DatabaseFacade Database { get; }
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

@@ -30,6 +30,7 @@ namespace DailyNotes.Api.Extensions
             services.AddScoped<IQuizService, QuizService>();
             services.AddScoped<IQuizAttemptService, QuizAttemptService>();
             services.AddScoped<ISearchService, SearchService>();
+            services.AddScoped<IMemoryItemService, MemoryItemService>();
 
             return services;
         }
@@ -45,7 +46,7 @@ namespace DailyNotes.Api.Extensions
                     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
                 services.AddDbContext<DailyNotesDbContext>(options =>
-                    options.UseNpgsql(connectionString));
+                    options.UseNpgsql(connectionString, o => o.UseVector()));
             }
 
             services.AddIdentityCore<IdentityUser>(options => options.SignIn.RequireConfirmedAccount = false)

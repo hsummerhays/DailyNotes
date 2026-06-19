@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using DailyNotes.Core.Entities;
 using DailyNotes.Application.Data;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace DailyNotes.Infrastructure.Data
@@ -38,10 +39,13 @@ namespace DailyNotes.Infrastructure.Data
         public DbSet<WebhookEvent> WebhookEvents { get; set; } = null!;
         public DbSet<ApiKey> ApiKeys { get; set; } = null!;
         public DbSet<WebhookSubscription> WebhookSubscriptions { get; set; } = null!;
+        public DbSet<MemoryItem> MemoryItems { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
+
+            builder.HasPostgresExtension("vector");
 
             // Tenant User key
             builder.Entity<TenantUser>()
@@ -147,6 +151,38 @@ namespace DailyNotes.Infrastructure.Data
             builder.Entity<ApiKey>().ToTable("api_keys");
 
             builder.Entity<WebhookSubscription>().ToTable("webhook_subscriptions");
+
+            builder.Entity<MemoryItem>().ToTable("memory_items");
+            builder.Entity<MemoryItem>().HasIndex(m => m.TenantId);
+            builder.Entity<MemoryItem>().HasIndex(m => new { m.TenantId, m.UserId });
+
+            if (Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory" || Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite")
+            {
+                builder.Entity<MemoryItem>()
+                    .Property(m => m.Embedding);
+            }
+            else
+            {
+                var vectorConverter = new ValueConverter<float[], Pgvector.Vector>(
+                    v => new Pgvector.Vector(v),
+                    v => v.ToArray());
+
+                var vectorComparer = new ValueComparer<float[]>(
+                    (a, b) => (a ?? Array.Empty<float>()).SequenceEqual(b ?? Array.Empty<float>()),
+                    v => v.Aggregate(0, (hash, x) => HashCode.Combine(hash, x)),
+                    v => v.ToArray());
+
+                builder.Entity<MemoryItem>()
+                    .Property(m => m.Embedding)
+                    .HasColumnType($"vector({MemoryItem.EmbeddingDimensions})")
+                    .HasConversion(vectorConverter, vectorComparer);
+            }
+
+            builder.Entity<MemoryItem>()
+                .HasOne(m => m.RelatedMemory)
+                .WithMany()
+                .HasForeignKey(m => m.RelatedMemoryId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             // Work Notes relationship (NoteDate -> WorkDate FK)
             builder.Entity<WorkNote>(entity =>

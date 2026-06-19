@@ -16,6 +16,7 @@
 | **Transaction management** | `WorkNoteService.CreateAsync` (WorkDay auto-create) and `QuizAttemptService.SubmitAsync` (scoring) wrapped in DB transactions |
 | **TopicNote security fix** | `GET /api/topics/{id}/notes` now correctly scopes TopicNotes by tenant + user |
 | **Program.cs extension methods** | DI registration split into `AddApplicationServices`, `AddInfrastructureServices`, `AddAuthConfiguration`, `AddSwaggerConfiguration` |
+| **Vector Memory (pgvector)** | Added `MemoryItem` with native `pgvector(1536)` database support, hybrid retrieval composite scoring (semantic, recency, importance), and graph linkages (`RelatedMemoryId`, source linkages). |
 
 ---
 
