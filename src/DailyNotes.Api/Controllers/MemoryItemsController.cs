@@ -40,6 +40,11 @@ namespace DailyNotes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<MemoryItem>> Create(MemoryItemRequest request)
         {
+            if (request.Embedding != null && request.Embedding.Length > 0 && request.Embedding.Length != 1536)
+            {
+                return BadRequest("Embedding vector must have exactly 1536 dimensions.");
+            }
+
             var created = await _service.CreateAsync(request);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
@@ -49,7 +54,14 @@ namespace DailyNotes.Api.Controllers
         /// <param name="request">The updated memory item data.</param>
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, MemoryItemRequest request)
-            => await _service.UpdateAsync(id, request) ? NoContent() : NotFound();
+        {
+            if (request.Embedding != null && request.Embedding.Length > 0 && request.Embedding.Length != 1536)
+            {
+                return BadRequest("Embedding vector must have exactly 1536 dimensions.");
+            }
+
+            return await _service.UpdateAsync(id, request) ? NoContent() : NotFound();
+        }
 
         /// <summary>Deletes a memory item.</summary>
         /// <param name="id">The ID of the memory item to delete.</param>
@@ -62,8 +74,13 @@ namespace DailyNotes.Api.Controllers
         [HttpPost("search")]
         public async Task<ActionResult<IEnumerable<MemoryItem>>> Search(MemorySearchRequest request)
         {
+            if (request.QueryEmbedding != null && request.QueryEmbedding.Length > 0 && request.QueryEmbedding.Length != 1536)
+            {
+                return BadRequest("Query embedding vector must have exactly 1536 dimensions.");
+            }
+
             var results = await _service.SearchAsync(
-                request.QueryEmbedding,
+                request.QueryEmbedding ?? System.Array.Empty<float>(),
                 request.MinImportanceScore,
                 request.MemoryType,
                 request.MemoryStatus,

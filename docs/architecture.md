@@ -75,7 +75,7 @@ Class library containing entities, DTOs, and interfaces — no external dependen
 | `QuizAnswer` | AttemptId, QuestionId, SelectedOptionId, IsCorrect (composite PK) |
 | `Course` | Id, TenantId, UserId, Name, Instructor, Semester, Credits, ExternalSource, ExternalId, ProgressPercent, TopicId |
 | `Assignment` | Id, CourseId, TenantId, UserId, Title, DueDate, Grade, Weight, Status |
-| `MemoryItem` | Id, TenantId, UserId, MemoryType, MemoryStatus, Summary, Embedding (float[]), ImportanceScore, AccessCount, CreatedAt, LastAccessedAt, LastConfirmedAt, RelatedMemoryId, SourceEntityType, SourceEntityId |
+| `MemoryItem` | Id, TenantId, UserId, MemoryType, MemoryStatus, Summary, Embedding (float[]), ImportanceScore, ConfidenceScore, AccessCount, CreatedAt, LastAccessedAt, LastConfirmedAt, RelatedMemoryId, SourceEntityType, SourceEntityId, SourceExcerpt |
 
 **Interfaces:**
 
@@ -382,13 +382,15 @@ CREATE TABLE memory_items (
     summary         TEXT NOT NULL,
     embedding       vector(1536) NOT NULL,
     importance_score DOUBLE PRECISION NOT NULL,
+    confidence_score DOUBLE PRECISION NOT NULL,
     access_count    INT NOT NULL DEFAULT 0,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     last_accessed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     last_confirmed_at TIMESTAMPTZ,
     related_memory_id INT REFERENCES memory_items(id) ON DELETE SET NULL,
     source_entity_type VARCHAR(50),
-    source_entity_id   INT
+    source_entity_id   INT,
+    source_excerpt  TEXT
 );
 CREATE INDEX ix_memory_items_tenant_id ON memory_items(tenant_id);
 CREATE INDEX ix_memory_items_tenant_user ON memory_items(tenant_id, user_id);

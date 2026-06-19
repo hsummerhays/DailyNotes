@@ -1,9 +1,7 @@
 using DailyNotes.Application.Data;
 using DailyNotes.Application.DTOs.Requests;
 using DailyNotes.Core.Entities;
-using DailyNotes.Core.Exceptions;
 using Microsoft.EntityFrameworkCore;
-using Pgvector;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,8 +24,6 @@ namespace DailyNotes.Application.Services
 
         public async Task<MemoryItem> CreateAsync(MemoryItemRequest request)
         {
-            ValidateEmbeddingDimensions(request.Embedding);
-
             var now = _clock.GetUtcNow().UtcDateTime;
             var item = new MemoryItem
             {
@@ -38,12 +34,15 @@ namespace DailyNotes.Application.Services
                 Summary = request.Summary,
                 Embedding = request.Embedding,
                 ImportanceScore = request.ImportanceScore,
+                ConfidenceScore = request.ConfidenceScore,
+                AccessCount = request.AccessCount,
                 CreatedAt = now,
                 LastAccessedAt = now,
                 LastConfirmedAt = request.LastConfirmedAt,
                 RelatedMemoryId = request.RelatedMemoryId,
                 SourceEntityType = request.SourceEntityType,
-                SourceEntityId = request.SourceEntityId
+                SourceEntityId = request.SourceEntityId,
+                SourceExcerpt = request.SourceExcerpt
             };
 
             _db.MemoryItems.Add(item);
@@ -53,8 +52,6 @@ namespace DailyNotes.Application.Services
 
         public async Task<bool> UpdateAsync(int id, MemoryItemRequest request)
         {
-            ValidateEmbeddingDimensions(request.Embedding);
-
             var existing = await TenantScoped(_db.MemoryItems).FirstOrDefaultAsync(m => m.Id == id);
             if (existing == null) return false;
 
@@ -63,11 +60,14 @@ namespace DailyNotes.Application.Services
             existing.Summary = request.Summary;
             existing.Embedding = request.Embedding;
             existing.ImportanceScore = request.ImportanceScore;
+            existing.ConfidenceScore = request.ConfidenceScore;
+            existing.AccessCount = request.AccessCount;
             existing.LastAccessedAt = _clock.GetUtcNow().UtcDateTime;
             existing.LastConfirmedAt = request.LastConfirmedAt;
             existing.RelatedMemoryId = request.RelatedMemoryId;
             existing.SourceEntityType = request.SourceEntityType;
             existing.SourceEntityId = request.SourceEntityId;
+            existing.SourceExcerpt = request.SourceExcerpt;
 
             await _db.SaveChangesAsync();
             return true;
@@ -94,8 +94,6 @@ namespace DailyNotes.Application.Services
             {
                 return Array.Empty<MemoryItem>();
             }
-
-            ValidateEmbeddingDimensions(queryEmbedding);
 
             List<MemoryItem> items;
 
@@ -152,7 +150,7 @@ namespace DailyNotes.Application.Services
                 }
 
                 sql += $" ORDER BY embedding <=> {{{paramIndex++}}} LIMIT {{{paramIndex}}}";
-                parameters.Add(new Vector(queryEmbedding));
+                parameters.Add(queryEmbedding);
                 parameters.Add(limitCandidates);
 
                 items = await _db.MemoryItems.FromSqlRaw(sql, parameters.ToArray()).ToListAsync();
@@ -160,9 +158,12 @@ namespace DailyNotes.Application.Services
 
             var now = _clock.GetUtcNow().UtcDateTime;
 
-            // Re-rank items using the composite score formula:
-            // score = semantic_similarity * 0.6 + importance_score * 0.2 + recency_score * 0.2
-            // Boost importance by frequency of access: recalled memories rank higher.
+            // Re-rank items using the hybrid composite score formula:
+            // FinalScore = 50% Semantic Similarity
+            //            + 20% Importance
+            //            + 15% Access Count
+            //            + 10% Recency
+            //            + 5% Confirmation
             var results = items
                 .Select(item =>
                 {
@@ -171,11 +172,14 @@ namespace DailyNotes.Application.Services
                     if (daysSinceAccess < 0) daysSinceAccess = 0; // clock skew safety
                     double recencyScore = 1.0 / (1.0 + daysSinceAccess);
 
-                    // access count boost (up to +100% boost to importance_score for 100+ recalls)
-                    double accessBoost = 1.0 + (Math.Min(item.AccessCount, 100) / 100.0);
-                    double boostedImportance = Math.Min(item.ImportanceScore * accessBoost, 1.0);
+                    double accessScore = 1.0 - (1.0 / (1.0 + item.AccessCount));
+                    double confirmationScore = item.LastConfirmedAt.HasValue ? 1.0 : 0.0;
 
-                    double compositeScore = (similarity * 0.6) + (boostedImportance * 0.2) + (recencyScore * 0.2);
+                    double compositeScore = (similarity * 0.50) 
+                                          + (item.ImportanceScore * 0.20) 
+                                          + (accessScore * 0.15) 
+                                          + (recencyScore * 0.10) 
+                                          + (confirmationScore * 0.05);
 
                     return new
                     {
@@ -200,15 +204,6 @@ namespace DailyNotes.Application.Services
             }
 
             return results;
-        }
-
-        private static void ValidateEmbeddingDimensions(float[] embedding)
-        {
-            if (embedding.Length != MemoryItem.EmbeddingDimensions)
-            {
-                throw new DomainException(
-                    $"Embedding must contain exactly {MemoryItem.EmbeddingDimensions} dimensions, but received {embedding.Length}.");
-            }
         }
 
         private static double CosineSimilarity(float[] vectorA, float[] vectorB)

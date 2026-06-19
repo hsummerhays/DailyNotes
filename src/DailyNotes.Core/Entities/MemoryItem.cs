@@ -15,6 +15,7 @@ namespace DailyNotes.Core.Entities
         public string Summary { get; set; } = string.Empty;
         public float[] Embedding { get; set; } = Array.Empty<float>();
         public double ImportanceScore { get; set; }
+        public double ConfidenceScore { get; set; }            // e.g., 0.95 (User entered), 0.80 (Derived), 0.55 (LLM inference)
         public int AccessCount { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime LastAccessedAt { get; set; } = DateTime.UtcNow;
@@ -24,6 +25,7 @@ namespace DailyNotes.Core.Entities
         public int? RelatedMemoryId { get; set; }
         public string? SourceEntityType { get; set; } // e.g., "Note", "Topic", "Course", "Task"
         public int? SourceEntityId { get; set; }      // ID of the source entity
+        public string? SourceExcerpt { get; set; }    // Exact text snippet evidence
 
         public MemoryItem? RelatedMemory { get; set; }
     }

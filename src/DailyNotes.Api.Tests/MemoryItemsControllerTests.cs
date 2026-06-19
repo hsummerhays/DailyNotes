@@ -47,8 +47,10 @@ namespace DailyNotes.Api.Tests
                 summary = "React 19 upgrades and Zustand state management pattern",
                 embedding = new float[1536], // Using a 1536-dimensional mock embedding vector
                 importanceScore = 0.8,
+                confidenceScore = 0.95,
                 sourceEntityType = "Note",
-                sourceEntityId = 42
+                sourceEntityId = 42,
+                sourceExcerpt = "I prefer remote jobs and Utah-based companies."
             };
             payload1.embedding[0] = 0.1f;
             payload1.embedding[1] = 0.2f;
@@ -63,8 +65,10 @@ namespace DailyNotes.Api.Tests
             Assert.Equal("Learning", createdItem.GetProperty("memoryType").GetString());
             Assert.Equal("Active", createdItem.GetProperty("memoryStatus").GetString());
             Assert.Equal(0.8, createdItem.GetProperty("importanceScore").GetDouble());
+            Assert.Equal(0.95, createdItem.GetProperty("confidenceScore").GetDouble());
             Assert.Equal("Note", createdItem.GetProperty("sourceEntityType").GetString());
             Assert.Equal(42, createdItem.GetProperty("sourceEntityId").GetInt32());
+            Assert.Equal("I prefer remote jobs and Utah-based companies.", createdItem.GetProperty("sourceExcerpt").GetString());
             Assert.Equal(0, createdItem.GetProperty("accessCount").GetInt32());
 
             var createdId = createdItem.GetProperty("id").GetInt32();
@@ -77,6 +81,7 @@ namespace DailyNotes.Api.Tests
                 summary = "Master advanced frontend state management",
                 embedding = new float[1536],
                 importanceScore = 0.9,
+                confidenceScore = 0.80,
                 relatedMemoryId = createdId
             };
             payload2.embedding[0] = 0.12f;
