@@ -95,6 +95,7 @@ src/                    # All source code
   DailyNotes.Application/
   DailyNotes.Core/
   DailyNotes.Infrastructure/
+  DailyNotes.Import/    # CSV import console tool
   DailyNotes.Api.Tests/
   daily-notes-ui/       # React SPA
 docs/                   # Architecture, setup, roadmap

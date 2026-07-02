@@ -563,7 +563,7 @@ React 19 SPA built with Vite, TypeScript, and Tailwind CSS 4.
 Integration tests using `WebApplicationFactory<Program>` with an InMemory database.
 
 - `CustomWebApplicationFactory` — swaps Postgres for InMemory DB; replaces JWT auth with `TestAuthHandler` that reads `X-User-Id` and `X-Tenant-Id` request headers as claims.
-- 18 tests across 11 controller test classes.
+- 22 tests across 12 controller test classes.
 - Run: `dotnet test`
 
 ---
