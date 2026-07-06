@@ -10,7 +10,10 @@ Ask before committing or pushing to git
 DailyNotes uses Clean Architecture with four projects and a strict dependency chain:
 
 ```
-Core  ←  Infrastructure  ←  Application  ←  Api
+Core  ←  Infrastructure
+Core  ←  Application  ←  Api
+           ↑
+     Infrastructure (via IDailyNotesDataContext)
 ```
 
 - **DailyNotes.Core** — entities, interfaces, DTOs. Zero external dependencies.
@@ -23,7 +26,7 @@ Core  ←  Infrastructure  ←  Application  ←  Api
 1. Add entities/interfaces to `DailyNotes.Core`
 2. Add a service interface `DailyNotes.Application/Services/I<Name>Service.cs`
 3. Add the implementation `DailyNotes.Application/Services/<Name>Service.cs` (inherit `ApplicationServiceBase`)
-4. Register `services.AddScoped<I<Name>Service, <Name>Service>()` in `DailyNotes.Api/Program.cs`
+4. Register `services.AddScoped<I<Name>Service, <Name>Service>()` in `DailyNotes.Api/Extensions/ServiceCollectionExtensions.cs` → `AddApplicationServices()`
 5. Inject the interface into the controller — **never inject `DailyNotesDbContext` directly into a controller**
 
 ## Tenant scoping
@@ -36,6 +39,12 @@ TenantOnlyScoped<T>(query)  // WHERE TenantId = x                 (IHasTenant en
 ```
 
 `ITenantContext` (scoped, resolved from `IHttpContextAccessor`) provides `UserId` and `TenantId` for the current request.
+
+As a second-layer safety net, `DailyNotesDbContext` applies EF Core global query filters (`HasQueryFilter`) to all 13 multi-tenant entities. A missing `TenantScoped` call will not leak cross-tenant data. The filter is bypassed automatically when no HTTP context is present (migrations, background jobs).
+
+## CancellationToken
+
+All service interface methods accept `CancellationToken ct = default` as the last parameter. Thread `ct` through to every EF Core async call (`ToListAsync(ct)`, `FirstOrDefaultAsync(pred, ct)`, `SaveChangesAsync(ct)`, etc.). Controllers forward `HttpContext.RequestAborted`.
 
 ## Running tests
 

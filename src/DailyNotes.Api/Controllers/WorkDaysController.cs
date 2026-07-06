@@ -33,19 +33,19 @@ namespace DailyNotes.Api.Controllers
             [FromQuery] bool all = false,
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 20)
-            => Ok(await _service.GetAllAsync(date, from, to, all, page, pageSize));
+            => Ok(await _service.GetAllAsync(date, from, to, all, page, pageSize, ct: HttpContext.RequestAborted));
 
         /// <summary>Retrieves the work day record representing the current date.</summary>
         [HttpGet("today")]
         public async Task<ActionResult<WorkDay>> GetToday()
-            => Ok(await _service.GetTodayAsync());
+            => Ok(await _service.GetTodayAsync(ct: HttpContext.RequestAborted));
 
         /// <summary>Retrieves a specific work day by its unique ID.</summary>
         /// <param name="id">The unique ID of the work day.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<WorkDay>> GetById(int id)
         {
-            var workDay = await _service.GetByIdAsync(id);
+            var workDay = await _service.GetByIdAsync(id, ct: HttpContext.RequestAborted);
             if (workDay == null) return NotFound();
             return workDay;
         }
@@ -55,7 +55,7 @@ namespace DailyNotes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<WorkDay>> Create(WorkDayRequest request)
         {
-            var created = await _service.CreateAsync(request);
+            var created = await _service.CreateAsync(request, ct: HttpContext.RequestAborted);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
@@ -64,12 +64,12 @@ namespace DailyNotes.Api.Controllers
         /// <param name="request">The updated work day data.</param>
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, WorkDayRequest request)
-            => await _service.UpdateAsync(id, request) ? NoContent() : NotFound();
+            => await _service.UpdateAsync(id, request, ct: HttpContext.RequestAborted) ? NoContent() : NotFound();
 
         /// <summary>Deletes a work day record.</summary>
         /// <param name="id">The ID of the record to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
-            => await _service.DeleteAsync(id) ? NoContent() : NotFound();
+            => await _service.DeleteAsync(id, ct: HttpContext.RequestAborted) ? NoContent() : NotFound();
     }
 }

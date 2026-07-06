@@ -14,7 +14,8 @@ namespace DailyNotes.Application.Services
             DateTime? dateFrom,
             DateTime? dateTo,
             int? projectId,
-            string? statuses)
+            string? statuses,
+            CancellationToken ct = default)
         {
             var validTypes = new[] { "all", "notes", "tasks", "topics" };
             if (!validTypes.Contains(type))
@@ -43,12 +44,10 @@ namespace DailyNotes.Application.Services
                         _db.WorkTasks.Any(t => t.Id == n.WorkTaskId && sList.Contains(t.Status)));
                 }
 
-                // Use EF.Functions.Like to push filtering into the database.
-                // For Postgres/JSONB, this performs a case-insensitive text search on the JSON column.
-                notesQuery = notesQuery.Where(n => EF.Functions.Like(
-                    EF.Property<string>(n, "Content").ToLower(), $"%{searchTerm}%"));
+                notesQuery = notesQuery.Where(n =>
+                    EF.Property<string>(n, "Content").ToLower().Contains(searchTerm));
 
-                results["workNotes"] = await notesQuery.OrderByDescending(n => n.NoteDate).ToListAsync();
+                results["workNotes"] = await notesQuery.OrderByDescending(n => n.NoteDate).ToListAsync(ct);
             }
 
             if (type == "all" || type == "tasks")
@@ -67,7 +66,7 @@ namespace DailyNotes.Application.Services
                 if (dateFrom.HasValue) tasksQuery = tasksQuery.Where(t => t.CreatedAt >= dateFrom.Value);
                 if (dateTo.HasValue) tasksQuery = tasksQuery.Where(t => t.CreatedAt <= dateTo.Value);
 
-                results["workTasks"] = await tasksQuery.OrderByDescending(t => t.CreatedAt).Take(50).ToListAsync();
+                results["workTasks"] = await tasksQuery.OrderByDescending(t => t.CreatedAt).Take(50).ToListAsync(ct);
             }
 
             if (type == "all" || type == "topics")
@@ -76,14 +75,14 @@ namespace DailyNotes.Application.Services
                     .Where(t => t.Title.ToLower().Contains(searchTerm)
                              || (t.Description != null && t.Description.ToLower().Contains(searchTerm)));
 
-                results["topics"] = await topicsQuery.OrderBy(t => t.Title).Take(50).ToListAsync();
+                results["topics"] = await topicsQuery.OrderBy(t => t.Title).Take(50).ToListAsync(ct);
 
                 var accessibleTopicIds = TenantScoped(_db.Topics).Select(t => t.Id);
                 var topicNotesQuery = _db.TopicNotes
                     .Where(n => n.Title != null && n.Title.ToLower().Contains(searchTerm)
                         && accessibleTopicIds.Contains(n.TopicId));
 
-                results["topicNotes"] = await topicNotesQuery.OrderByDescending(n => n.CreatedAt).Take(50).ToListAsync();
+                results["topicNotes"] = await topicNotesQuery.OrderByDescending(n => n.CreatedAt).Take(50).ToListAsync(ct);
             }
 
             return results;

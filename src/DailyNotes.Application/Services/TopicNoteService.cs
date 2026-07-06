@@ -9,7 +9,7 @@ namespace DailyNotes.Application.Services
     {
         public TopicNoteService(IDailyNotesDataContext db, ITenantContext tc, TimeProvider clock) : base(db, tc, clock) { }
 
-        public async Task<IEnumerable<TopicNote>> GetAllAsync(int? topicId, int? tagId)
+        public async Task<IEnumerable<TopicNote>> GetAllAsync(int? topicId, int? tagId, CancellationToken ct = default)
         {
             var query = TenantScoped(_db.TopicNotes).AsQueryable();
 
@@ -23,13 +23,13 @@ namespace DailyNotes.Application.Services
                 query = query.Where(n => taggedItemIds.Contains(n.Id));
             }
 
-            return await query.OrderByDescending(n => n.CreatedAt).ToListAsync();
+            return await query.OrderByDescending(n => n.CreatedAt).ToListAsync(ct);
         }
 
-        public async Task<TopicNote?> GetByIdAsync(int id)
-            => await TenantScoped(_db.TopicNotes).FirstOrDefaultAsync(n => n.Id == id);
+        public async Task<TopicNote?> GetByIdAsync(int id, CancellationToken ct = default)
+            => await TenantScoped(_db.TopicNotes).FirstOrDefaultAsync(n => n.Id == id, ct);
 
-        public async Task<TopicNote> CreateAsync(TopicNoteRequest request)
+        public async Task<TopicNote> CreateAsync(TopicNoteRequest request, CancellationToken ct = default)
         {
             var now = _clock.GetUtcNow().UtcDateTime;
             var topicNote = new TopicNote
@@ -46,13 +46,13 @@ namespace DailyNotes.Application.Services
             };
 
             _db.TopicNotes.Add(topicNote);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             return topicNote;
         }
 
-        public async Task<bool> UpdateAsync(int id, TopicNoteRequest request)
+        public async Task<bool> UpdateAsync(int id, TopicNoteRequest request, CancellationToken ct = default)
         {
-            var existing = await TenantScoped(_db.TopicNotes).FirstOrDefaultAsync(n => n.Id == id);
+            var existing = await TenantScoped(_db.TopicNotes).FirstOrDefaultAsync(n => n.Id == id, ct);
             if (existing == null) return false;
 
             existing.TopicId = request.TopicId;
@@ -62,17 +62,17 @@ namespace DailyNotes.Application.Services
             existing.Visibility = request.Visibility;
             existing.UpdatedAt = _clock.GetUtcNow().UtcDateTime;
 
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             return true;
         }
 
-        public async Task<bool> DeleteAsync(int id)
+        public async Task<bool> DeleteAsync(int id, CancellationToken ct = default)
         {
-            var note = await TenantScoped(_db.TopicNotes).FirstOrDefaultAsync(n => n.Id == id);
+            var note = await TenantScoped(_db.TopicNotes).FirstOrDefaultAsync(n => n.Id == id, ct);
             if (note == null) return false;
 
             _db.TopicNotes.Remove(note);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             return true;
         }
     }

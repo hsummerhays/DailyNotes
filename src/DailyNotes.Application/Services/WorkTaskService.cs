@@ -9,29 +9,29 @@ namespace DailyNotes.Application.Services
     {
         public WorkTaskService(IDailyNotesDataContext db, ITenantContext tc, TimeProvider clock) : base(db, tc, clock) { }
 
-        public async Task<IEnumerable<WorkTask>> GetAllAsync(string? status, int? projectId)
+        public async Task<IEnumerable<WorkTask>> GetAllAsync(string? status, int? projectId, CancellationToken ct = default)
         {
             var query = TenantScoped(_db.WorkTasks).AsQueryable();
 
             if (!string.IsNullOrEmpty(status)) query = query.Where(t => t.Status == status);
             if (projectId.HasValue) query = query.Where(t => t.ProjectId == projectId.Value);
 
-            return await query.OrderByDescending(t => t.CreatedAt).ToListAsync();
+            return await query.OrderByDescending(t => t.CreatedAt).ToListAsync(ct);
         }
 
-        public async Task<IEnumerable<WorkTask>> GetOverdueAsync()
+        public async Task<IEnumerable<WorkTask>> GetOverdueAsync(CancellationToken ct = default)
         {
             var now = DateOnly.FromDateTime(_clock.GetUtcNow().UtcDateTime);
             return await TenantScoped(_db.WorkTasks)
                 .Where(t => t.DueDate.HasValue && t.DueDate < now && t.Status != "completed")
                 .OrderBy(t => t.DueDate)
-                .ToListAsync();
+                .ToListAsync(ct);
         }
 
-        public async Task<WorkTask?> GetByIdAsync(int id)
-            => await TenantScoped(_db.WorkTasks).FirstOrDefaultAsync(t => t.Id == id);
+        public async Task<WorkTask?> GetByIdAsync(int id, CancellationToken ct = default)
+            => await TenantScoped(_db.WorkTasks).FirstOrDefaultAsync(t => t.Id == id, ct);
 
-        public async Task<WorkTask> CreateAsync(WorkTaskRequest request)
+        public async Task<WorkTask> CreateAsync(WorkTaskRequest request, CancellationToken ct = default)
         {
             var now = _clock.GetUtcNow().UtcDateTime;
             var workTask = new WorkTask
@@ -54,13 +54,13 @@ namespace DailyNotes.Application.Services
             };
 
             _db.WorkTasks.Add(workTask);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             return workTask;
         }
 
-        public async Task<bool> UpdateAsync(int id, WorkTaskRequest request)
+        public async Task<bool> UpdateAsync(int id, WorkTaskRequest request, CancellationToken ct = default)
         {
-            var existing = await TenantScoped(_db.WorkTasks).FirstOrDefaultAsync(t => t.Id == id);
+            var existing = await TenantScoped(_db.WorkTasks).FirstOrDefaultAsync(t => t.Id == id, ct);
             if (existing == null) return false;
 
             existing.Name = request.Name;
@@ -76,17 +76,17 @@ namespace DailyNotes.Application.Services
             existing.Comments = request.Comments;
             existing.UpdatedAt = _clock.GetUtcNow().UtcDateTime;
 
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             return true;
         }
 
-        public async Task<bool> DeleteAsync(int id)
+        public async Task<bool> DeleteAsync(int id, CancellationToken ct = default)
         {
-            var task = await TenantScoped(_db.WorkTasks).FirstOrDefaultAsync(t => t.Id == id);
+            var task = await TenantScoped(_db.WorkTasks).FirstOrDefaultAsync(t => t.Id == id, ct);
             if (task == null) return false;
 
             _db.WorkTasks.Remove(task);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             return true;
         }
     }

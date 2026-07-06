@@ -25,14 +25,14 @@ namespace DailyNotes.Api.Controllers
         public async Task<ActionResult<IEnumerable<Quiz>>> GetAll(
             [FromQuery] int? topicId,
             [FromQuery] int? difficulty)
-            => Ok(await _service.GetAllAsync(topicId, difficulty));
+            => Ok(await _service.GetAllAsync(topicId, difficulty, ct: HttpContext.RequestAborted));
 
         /// <summary>Retrieves a full quiz by its ID, including all questions and available options.</summary>
         /// <param name="id">The unique ID of the quiz.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<object>> GetById(int id)
         {
-            var detail = await _service.GetByIdAsync(id);
+            var detail = await _service.GetByIdAsync(id, ct: HttpContext.RequestAborted);
             if (detail == null) return NotFound();
             return Ok(detail);
         }
@@ -42,7 +42,7 @@ namespace DailyNotes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<Quiz>> Create(QuizRequest request)
         {
-            var created = await _service.CreateAsync(request);
+            var created = await _service.CreateAsync(request, ct: HttpContext.RequestAborted);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
@@ -51,13 +51,13 @@ namespace DailyNotes.Api.Controllers
         /// <param name="request">The updated quiz data.</param>
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, QuizRequest request)
-            => await _service.UpdateAsync(id, request) ? NoContent() : NotFound();
+            => await _service.UpdateAsync(id, request, ct: HttpContext.RequestAborted) ? NoContent() : NotFound();
 
         /// <summary>Deletes a quiz and all its associated questions and options.</summary>
         /// <param name="id">The ID of the quiz to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
-            => await _service.DeleteAsync(id) ? NoContent() : NotFound();
+            => await _service.DeleteAsync(id, ct: HttpContext.RequestAborted) ? NoContent() : NotFound();
 
         /// <summary>Adds a new question to a specific quiz.</summary>
         /// <param name="quizId">The ID of the quiz.</param>
@@ -65,7 +65,7 @@ namespace DailyNotes.Api.Controllers
         [HttpPost("{quizId}/questions")]
         public async Task<ActionResult<QuizQuestion>> AddQuestion(int quizId, QuizQuestionRequest request)
         {
-            var result = await _service.AddQuestionAsync(quizId, request);
+            var result = await _service.AddQuestionAsync(quizId, request, ct: HttpContext.RequestAborted);
             if (result == null) return NotFound(new { message = "Quiz not found." });
             return Ok(result);
         }
@@ -76,7 +76,7 @@ namespace DailyNotes.Api.Controllers
         [HttpPost("questions/{questionId}/options")]
         public async Task<ActionResult<QuizOption>> AddOption(int questionId, QuizOptionRequest request)
         {
-            var result = await _service.AddOptionAsync(questionId, request);
+            var result = await _service.AddOptionAsync(questionId, request, ct: HttpContext.RequestAborted);
             if (result == null) return NotFound(new { message = "Question not found or access denied." });
             return Ok(result);
         }

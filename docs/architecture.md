@@ -71,7 +71,7 @@ Class library containing entities, DTOs, and interfaces — no external dependen
 | `Quiz` | Id, TenantId, TopicId, Title, Difficulty (1–5) |
 | `QuizQuestion` | Id, QuizId, QuestionText, Explanation, SortOrder |
 | `QuizOption` | Id, QuestionId, OptionText, IsCorrect, SortOrder |
-| `QuizAttempt` | Id, QuizId, UserId, Score, StartedAt, CompletedAt |
+| `QuizAttempt` | Id, TenantId, QuizId, UserId, Score, StartedAt, CompletedAt |
 | `QuizAnswer` | AttemptId, QuestionId, SelectedOptionId, IsCorrect (composite PK) |
 | `Course` | Id, TenantId, UserId, Name, Instructor, Semester, Credits, ExternalSource, ExternalId, ProgressPercent, TopicId |
 | `Assignment` | Id, CourseId, TenantId, UserId, Title, DueDate, Grade, Weight, Status |
@@ -115,6 +115,7 @@ Class library containing entities, DTOs, and interfaces — no external dependen
 - `DailyNotesDbContext` with entity configurations (extends `IdentityDbContext`)
 - **ASP.NET Core Identity** user/role tables stored in the same Postgres database
 - Database migrations via `dotnet ef`
+- **Global query filters** — `DailyNotesDbContext` injects `IHttpContextAccessor` and automatically applies `WHERE tenant_id = @current` to all 13 multi-tenant entities at the EF Core model level. Bypasses itself when no HTTP context (migrations, background jobs). Services still call `TenantScoped()` / `TenantOnlyScoped()` explicitly; the global filter is a second-layer safety net against missing calls.
 
 **Provider implementations:**
 
@@ -167,6 +168,12 @@ CREATE INDEX ix_projects_tenant_id ON projects(tenant_id);
 --   external_source VARCHAR(50),  -- 'jira' | 'salesforce' | 'gitlab' | etc.
 --   external_id    VARCHAR(255),
 --   is_pinned      BOOLEAN NOT NULL DEFAULT FALSE
+
+-- Composite tenant/user indexes on high-traffic tables
+CREATE INDEX ix_work_days_tenant_user   ON work_days(tenant_id, user_id);
+CREATE INDEX ix_work_notes_tenant_user  ON work_notes(tenant_id, user_id);
+CREATE INDEX ix_work_tasks_tenant_user  ON work_tasks(tenant_id, user_id);
+CREATE INDEX ix_pay_periods_tenant_user ON pay_periods(tenant_id, user_id);
 
 CREATE TABLE integration_connections (
     id              SERIAL PRIMARY KEY,
@@ -295,6 +302,7 @@ CREATE TABLE topic_notes (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX ix_topic_notes_topic_id ON topic_notes(topic_id);
+CREATE INDEX ix_topic_notes_tenant_user ON topic_notes(tenant_id, user_id);
 
 CREATE TABLE item_tags (
     tag_id      INT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
@@ -332,12 +340,14 @@ CREATE TABLE quiz_options (
 
 CREATE TABLE quiz_attempts (
     id              SERIAL PRIMARY KEY,
+    tenant_id       INT NOT NULL REFERENCES tenants(id),
     quiz_id         INT NOT NULL REFERENCES quizzes(id),
     user_id         TEXT NOT NULL,
     score           DECIMAL(5,2),
     started_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     completed_at    TIMESTAMPTZ
 );
+CREATE INDEX ix_quiz_attempts_tenant_user ON quiz_attempts(tenant_id, user_id);
 
 CREATE TABLE quiz_answers (
     attempt_id          INT NOT NULL REFERENCES quiz_attempts(id) ON DELETE CASCADE,
@@ -384,6 +394,7 @@ CREATE TABLE assignments (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX ix_assignments_course_id ON assignments(course_id);
+CREATE INDEX ix_assignments_tenant_user ON assignments(tenant_id, user_id);
 
 CREATE TABLE memory_items (
     id              SERIAL PRIMARY KEY,
@@ -421,6 +432,8 @@ Contains all use-case logic. Services inherit `ApplicationServiceBase` which pro
 - `TenantScoped<T>(query)` — adds `WHERE TenantId = x AND UserId = y` (for `IHasTenantUser` entities)
 - `TenantOnlyScoped<T>(query)` — adds `WHERE TenantId = x` (for `IHasTenant` entities: `Tag`, `Quiz`)
 
+All service interface methods accept `CancellationToken ct = default` as the last parameter. Controllers forward `HttpContext.RequestAborted` so client disconnects cancel in-flight DB queries.
+
 **Service interfaces:**
 
 | Interface | Domain |
@@ -437,7 +450,7 @@ Contains all use-case logic. Services inherit `ApplicationServiceBase` which pro
 | `IAttachmentService` | Attachment CRUD (metadata only) |
 | `IPayPeriodService` | Pay period CRUD + work days for period |
 | `IQuizService` | Quiz CRUD + add question/option |
-| `IQuizAttemptService` | Attempt history, detail, submit (scoring wrapped in transaction) |
+| `IQuizAttemptService` | Attempt history, detail, submit (scoring wrapped in transaction; validates all question/option IDs belong to the submitted quiz) |
 | `ISearchService` | Cross-entity search (notes, tasks, topics) |
 
 **`ITenantContext`** is defined here and implemented in the Api layer as `HttpTenantContext` (reads JWT claims via `IHttpContextAccessor`).
@@ -491,12 +504,12 @@ All endpoints except `/api/auth/*` require `[Authorize]` with a valid JWT Bearer
 
 **Cross-cutting configuration** (`Program.cs` + `Api/Extensions/ServiceCollectionExtensions.cs`):
 - `AddInfrastructureServices` — DbContext, Identity, `IDailyNotesDataContext`, auth service, provider stubs, `TimeProvider.System`
-- `AddApplicationServices` — all 14 service interface → implementation registrations
+- `AddApplicationServices` — all 15 service interface → implementation registrations
 - `AddAuthConfiguration` — JWT Bearer validation parameters
 - `AddSwaggerConfiguration` — OpenAPI doc + Bearer security scheme
-- CORS for `localhost:5173` (Vite) and `localhost:4200`
+- CORS — origins read from `Cors:AllowedOrigins` config key (comma-separated); falls back to `localhost:5173` and `localhost:4200`
 - Rate limiting on auth endpoints (10 req/min)
-- Global exception handler: `DomainException` → its `StatusCode`; all others → 500
+- Global exception handler: `DomainException` → its `StatusCode`; `UnauthorizedAccessException` → 401; all others → 500
 
 ---
 
@@ -563,7 +576,7 @@ React 19 SPA built with Vite, TypeScript, and Tailwind CSS 4.
 Integration tests using `WebApplicationFactory<Program>` with an InMemory database.
 
 - `CustomWebApplicationFactory` — swaps Postgres for InMemory DB; replaces JWT auth with `TestAuthHandler` that reads `X-User-Id` and `X-Tenant-Id` request headers as claims.
-- 22 tests across 12 controller test classes.
+- 23 tests across 12 controller test classes, including unauthenticated-request (401) tests.
 - Run: `dotnet test`
 
 ---

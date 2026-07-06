@@ -9,7 +9,7 @@ namespace DailyNotes.Application.Services
     {
         public WorkNoteService(IDailyNotesDataContext db, ITenantContext tc, TimeProvider clock) : base(db, tc, clock) { }
 
-        public async Task<IEnumerable<WorkNote>> GetAllAsync(DateOnly? date, int? taskId, int page, int pageSize)
+        public async Task<IEnumerable<WorkNote>> GetAllAsync(DateOnly? date, int? taskId, int page, int pageSize, CancellationToken ct = default)
         {
             pageSize = Math.Min(pageSize, 100);
             var query = TenantScoped(_db.WorkNotes).AsQueryable();
@@ -22,13 +22,13 @@ namespace DailyNotes.Application.Services
                 .ThenByDescending(n => n.CreatedAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
-                .ToListAsync();
+                .ToListAsync(ct);
         }
 
-        public async Task<WorkNote?> GetByIdAsync(int id)
-            => await TenantScoped(_db.WorkNotes).FirstOrDefaultAsync(n => n.Id == id);
+        public async Task<WorkNote?> GetByIdAsync(int id, CancellationToken ct = default)
+            => await TenantScoped(_db.WorkNotes).FirstOrDefaultAsync(n => n.Id == id, ct);
 
-        public async Task<WorkNote> CreateAsync(WorkNoteRequest request)
+        public async Task<WorkNote> CreateAsync(WorkNoteRequest request, CancellationToken ct = default)
         {
             var now = _clock.GetUtcNow().UtcDateTime;
             var workNote = new WorkNote
@@ -48,12 +48,12 @@ namespace DailyNotes.Application.Services
             };
 
             // work_notes has a FK on NoteDate → work_days.WorkDate; ensure the row exists first
-            using var transaction = await _db.Database.BeginTransactionAsync();
+            using var transaction = await _db.Database.BeginTransactionAsync(ct);
 
             var workDayExists = await _db.WorkDays.AnyAsync(d =>
                 d.TenantId == _tc.TenantId &&
                 d.UserId == _tc.UserId &&
-                d.WorkDate == workNote.NoteDate);
+                d.WorkDate == workNote.NoteDate, ct);
 
             if (!workDayExists)
             {
@@ -65,19 +65,19 @@ namespace DailyNotes.Application.Services
                     CreatedAt = now,
                     UpdatedAt = now
                 });
-                await _db.SaveChangesAsync();
+                await _db.SaveChangesAsync(ct);
             }
 
             _db.WorkNotes.Add(workNote);
-            await _db.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await _db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
 
             return workNote;
         }
 
-        public async Task<bool> UpdateAsync(int id, WorkNoteRequest request)
+        public async Task<bool> UpdateAsync(int id, WorkNoteRequest request, CancellationToken ct = default)
         {
-            var existing = await TenantScoped(_db.WorkNotes).FirstOrDefaultAsync(n => n.Id == id);
+            var existing = await TenantScoped(_db.WorkNotes).FirstOrDefaultAsync(n => n.Id == id, ct);
             if (existing == null) return false;
 
             existing.WorkTaskId = request.WorkTaskId;
@@ -90,17 +90,17 @@ namespace DailyNotes.Application.Services
             existing.Visibility = request.Visibility;
             existing.UpdatedAt = _clock.GetUtcNow().UtcDateTime;
 
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             return true;
         }
 
-        public async Task<bool> DeleteAsync(int id)
+        public async Task<bool> DeleteAsync(int id, CancellationToken ct = default)
         {
-            var note = await TenantScoped(_db.WorkNotes).FirstOrDefaultAsync(n => n.Id == id);
+            var note = await TenantScoped(_db.WorkNotes).FirstOrDefaultAsync(n => n.Id == id, ct);
             if (note == null) return false;
 
             _db.WorkNotes.Remove(note);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             return true;
         }
     }

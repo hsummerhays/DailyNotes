@@ -29,14 +29,14 @@ namespace DailyNotes.Api.Controllers
             [FromQuery] int? taskId,
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 20)
-            => Ok(await _service.GetAllAsync(date, taskId, page, pageSize));
+            => Ok(await _service.GetAllAsync(date, taskId, page, pageSize, ct: HttpContext.RequestAborted));
 
         /// <summary>Retrieves a specific work note by its unique ID.</summary>
         /// <param name="id">The unique ID of the note.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<WorkNote>> GetById(int id)
         {
-            var note = await _service.GetByIdAsync(id);
+            var note = await _service.GetByIdAsync(id, ct: HttpContext.RequestAborted);
             if (note == null) return NotFound();
             return note;
         }
@@ -49,7 +49,7 @@ namespace DailyNotes.Api.Controllers
             if (request.WorkTaskId == null)
                 return BadRequest(new { message = "A linked task is required." });
 
-            var created = await _service.CreateAsync(request);
+            var created = await _service.CreateAsync(request, ct: HttpContext.RequestAborted);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
@@ -58,12 +58,12 @@ namespace DailyNotes.Api.Controllers
         /// <param name="request">The updated work note data.</param>
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, WorkNoteRequest request)
-            => await _service.UpdateAsync(id, request) ? NoContent() : NotFound();
+            => await _service.UpdateAsync(id, request, ct: HttpContext.RequestAborted) ? NoContent() : NotFound();
 
         /// <summary>Deletes a work note.</summary>
         /// <param name="id">The ID of the note to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
-            => await _service.DeleteAsync(id) ? NoContent() : NotFound();
+            => await _service.DeleteAsync(id, ct: HttpContext.RequestAborted) ? NoContent() : NotFound();
     }
 }

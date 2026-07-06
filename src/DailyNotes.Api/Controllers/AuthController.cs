@@ -24,13 +24,9 @@ namespace DailyNotes.Api.Controllers
         [EnableRateLimiting("auth")]
         public async Task<IActionResult> Register([FromBody] RegisterDto model)
         {
-            try
-            {
-                var result = await _authService.RegisterAsync(model);
-                SetRefreshTokenCookie(result.RefreshToken);
-                return Ok(result.Response);
-            }
-            catch (Exception ex) { return BadRequest(new { message = ex.Message }); }
+            var result = await _authService.RegisterAsync(model);
+            SetRefreshTokenCookie(result.RefreshToken);
+            return Ok(result.Response);
         }
 
         /// <summary>Authenticates a user and returns a JWT access token.</summary>
@@ -38,13 +34,9 @@ namespace DailyNotes.Api.Controllers
         [EnableRateLimiting("auth")]
         public async Task<IActionResult> Login([FromBody] LoginDto model)
         {
-            try
-            {
-                var result = await _authService.LoginAsync(model);
-                SetRefreshTokenCookie(result.RefreshToken);
-                return Ok(result.Response);
-            }
-            catch (Exception ex) { return Unauthorized(new { message = ex.Message }); }
+            var result = await _authService.LoginAsync(model);
+            SetRefreshTokenCookie(result.RefreshToken);
+            return Ok(result.Response);
         }
 
         /// <summary>Refreshes an expired JWT using the httpOnly refresh token cookie.</summary>
@@ -55,13 +47,9 @@ namespace DailyNotes.Api.Controllers
             if (string.IsNullOrEmpty(refreshToken))
                 return Unauthorized(new { message = "No refresh token provided." });
 
-            try
-            {
-                var result = await _authService.RefreshTokenAsync(refreshToken);
-                SetRefreshTokenCookie(result.RefreshToken);
-                return Ok(result.Response);
-            }
-            catch (Exception ex) { return Unauthorized(new { message = ex.Message }); }
+            var result = await _authService.RefreshTokenAsync(refreshToken);
+            SetRefreshTokenCookie(result.RefreshToken);
+            return Ok(result.Response);
         }
 
         /// <summary>Logs out the current user by clearing the refresh token cookie.</summary>

@@ -9,31 +9,31 @@ namespace DailyNotes.Application.Services
     {
         public PayPeriodService(IDailyNotesDataContext db, ITenantContext tc, TimeProvider clock) : base(db, tc, clock) { }
 
-        public async Task<IEnumerable<PayPeriod>> GetAllAsync(DateOnly? date)
+        public async Task<IEnumerable<PayPeriod>> GetAllAsync(DateOnly? date, CancellationToken ct = default)
         {
             var query = TenantScoped(_db.PayPeriods).AsQueryable();
 
             if (date.HasValue)
                 query = query.Where(p => p.PeriodStartDate <= date.Value && p.PeriodEndDate >= date.Value);
 
-            return await query.OrderByDescending(p => p.PeriodEndDate).ToListAsync();
+            return await query.OrderByDescending(p => p.PeriodEndDate).ToListAsync(ct);
         }
 
-        public async Task<PayPeriod?> GetByIdAsync(int id)
-            => await TenantScoped(_db.PayPeriods).FirstOrDefaultAsync(p => p.Id == id);
+        public async Task<PayPeriod?> GetByIdAsync(int id, CancellationToken ct = default)
+            => await TenantScoped(_db.PayPeriods).FirstOrDefaultAsync(p => p.Id == id, ct);
 
-        public async Task<IEnumerable<WorkDay>?> GetWorkDaysAsync(int id)
+        public async Task<IEnumerable<WorkDay>?> GetWorkDaysAsync(int id, CancellationToken ct = default)
         {
-            var period = await TenantScoped(_db.PayPeriods).FirstOrDefaultAsync(p => p.Id == id);
+            var period = await TenantScoped(_db.PayPeriods).FirstOrDefaultAsync(p => p.Id == id, ct);
             if (period == null) return null;
 
             return await TenantScoped(_db.WorkDays)
                 .Where(w => w.WorkDate >= period.PeriodStartDate && w.WorkDate <= period.PeriodEndDate)
                 .OrderBy(w => w.WorkDate)
-                .ToListAsync();
+                .ToListAsync(ct);
         }
 
-        public async Task<PayPeriod> CreateAsync(PayPeriodRequest request)
+        public async Task<PayPeriod> CreateAsync(PayPeriodRequest request, CancellationToken ct = default)
         {
             var payPeriod = new PayPeriod
             {
@@ -48,13 +48,13 @@ namespace DailyNotes.Application.Services
             };
 
             _db.PayPeriods.Add(payPeriod);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             return payPeriod;
         }
 
-        public async Task<bool> UpdateAsync(int id, PayPeriodRequest request)
+        public async Task<bool> UpdateAsync(int id, PayPeriodRequest request, CancellationToken ct = default)
         {
-            var existing = await TenantScoped(_db.PayPeriods).FirstOrDefaultAsync(p => p.Id == id);
+            var existing = await TenantScoped(_db.PayPeriods).FirstOrDefaultAsync(p => p.Id == id, ct);
             if (existing == null) return false;
 
             existing.PeriodStartDate = request.PeriodStartDate;
@@ -63,17 +63,17 @@ namespace DailyNotes.Application.Services
             existing.PtoReported = request.PtoReported;
             existing.PtoDaysOfMonth = request.PtoDaysOfMonth;
 
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             return true;
         }
 
-        public async Task<bool> DeleteAsync(int id)
+        public async Task<bool> DeleteAsync(int id, CancellationToken ct = default)
         {
-            var period = await TenantScoped(_db.PayPeriods).FirstOrDefaultAsync(p => p.Id == id);
+            var period = await TenantScoped(_db.PayPeriods).FirstOrDefaultAsync(p => p.Id == id, ct);
             if (period == null) return false;
 
             _db.PayPeriods.Remove(period);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             return true;
         }
     }

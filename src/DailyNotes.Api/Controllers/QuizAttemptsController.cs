@@ -22,14 +22,14 @@ namespace DailyNotes.Api.Controllers
         /// <param name="quizId">Filter history by a specific quiz.</param>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<QuizAttempt>>> GetAll([FromQuery] int? quizId)
-            => Ok(await _service.GetAllAsync(quizId));
+            => Ok(await _service.GetAllAsync(quizId, ct: HttpContext.RequestAborted));
 
         /// <summary>Retrieves a specific quiz attempt by its ID, including the user's submitted answers.</summary>
         /// <param name="id">The unique ID of the quiz attempt.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<object>> GetById(int id)
         {
-            var detail = await _service.GetByIdAsync(id);
+            var detail = await _service.GetByIdAsync(id, ct: HttpContext.RequestAborted);
             if (detail == null) return NotFound();
             return Ok(detail);
         }
@@ -41,7 +41,7 @@ namespace DailyNotes.Api.Controllers
         {
             try
             {
-                var attempt = await _service.SubmitAsync(submission);
+                var attempt = await _service.SubmitAsync(submission, ct: HttpContext.RequestAborted);
                 return CreatedAtAction(nameof(GetById), new { id = attempt.Id }, attempt);
             }
             catch (KeyNotFoundException ex)

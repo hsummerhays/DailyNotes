@@ -9,24 +9,24 @@ namespace DailyNotes.Application.Services
     {
         public ProjectService(IDailyNotesDataContext db, ITenantContext tc, TimeProvider clock) : base(db, tc, clock) { }
 
-        public async Task<IEnumerable<Project>> GetAllAsync()
-            => await TenantScoped(_db.Projects).OrderByDescending(p => p.CreatedAt).ToListAsync();
+        public async Task<IEnumerable<Project>> GetAllAsync(CancellationToken ct = default)
+            => await TenantScoped(_db.Projects).OrderByDescending(p => p.CreatedAt).ToListAsync(ct);
 
-        public async Task<Project?> GetByIdAsync(int id)
-            => await TenantScoped(_db.Projects).FirstOrDefaultAsync(p => p.Id == id);
+        public async Task<Project?> GetByIdAsync(int id, CancellationToken ct = default)
+            => await TenantScoped(_db.Projects).FirstOrDefaultAsync(p => p.Id == id, ct);
 
-        public async Task<IEnumerable<WorkTask>?> GetProjectTasksAsync(int id)
+        public async Task<IEnumerable<WorkTask>?> GetProjectTasksAsync(int id, CancellationToken ct = default)
         {
-            var project = await TenantScoped(_db.Projects).FirstOrDefaultAsync(p => p.Id == id);
+            var project = await TenantScoped(_db.Projects).FirstOrDefaultAsync(p => p.Id == id, ct);
             if (project == null) return null;
 
             return await TenantScoped(_db.WorkTasks)
                 .Where(t => t.ProjectId == id)
                 .OrderByDescending(t => t.CreatedAt)
-                .ToListAsync();
+                .ToListAsync(ct);
         }
 
-        public async Task<Project> CreateAsync(ProjectRequest request)
+        public async Task<Project> CreateAsync(ProjectRequest request, CancellationToken ct = default)
         {
             var now = _clock.GetUtcNow().UtcDateTime;
             var project = new Project
@@ -43,13 +43,13 @@ namespace DailyNotes.Application.Services
             };
 
             _db.Projects.Add(project);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             return project;
         }
 
-        public async Task<bool> UpdateAsync(int id, ProjectRequest request)
+        public async Task<bool> UpdateAsync(int id, ProjectRequest request, CancellationToken ct = default)
         {
-            var existing = await TenantScoped(_db.Projects).FirstOrDefaultAsync(p => p.Id == id);
+            var existing = await TenantScoped(_db.Projects).FirstOrDefaultAsync(p => p.Id == id, ct);
             if (existing == null) return false;
 
             existing.Name = request.Name;
@@ -59,17 +59,17 @@ namespace DailyNotes.Application.Services
             existing.CompletedDate = request.CompletedDate;
             existing.UpdatedAt = _clock.GetUtcNow().UtcDateTime;
 
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             return true;
         }
 
-        public async Task<bool> DeleteAsync(int id)
+        public async Task<bool> DeleteAsync(int id, CancellationToken ct = default)
         {
-            var project = await TenantScoped(_db.Projects).FirstOrDefaultAsync(p => p.Id == id);
+            var project = await TenantScoped(_db.Projects).FirstOrDefaultAsync(p => p.Id == id, ct);
             if (project == null) return false;
 
             _db.Projects.Remove(project);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             return true;
         }
     }

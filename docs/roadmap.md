@@ -4,14 +4,25 @@
 
 | Item | Notes |
 |---|---|
+| **Environment configuration (.env)** | Consolidated all hardcoded secrets (JWT key, connection string passwords, import password) into a root `.env` file. Introduced `EnvLoader` in `DailyNotes.Infrastructure` to load these variables automatically at application startup. |
+| **Git history cleanup** | Cleaned and purged all historical commits containing plaintext secrets (JWT keys, database credentials, passwords) from the repository history using `git-filter-repo`. |
 | **Clean Architecture refactor** | `DailyNotes.Application` layer added; all controllers inject service interfaces, no direct DbContext access |
 | **IDailyNotesDataContext interface** | Application layer no longer references Infrastructure directly; `DailyNotesDbContext` implements the interface; Application services are independently testable |
 | **Request DTOs** | All POST/PUT endpoints accept typed request DTOs instead of raw domain entities — clients cannot supply `TenantId`, `UserId`, or `CreatedAt` |
 | **DomainException** | Typed exception with `StatusCode`; auth and validation failures return 400/401 instead of 500 |
 | **TimeProvider injection** | `ApplicationServiceBase` accepts `TimeProvider`; all `DateTime.UtcNow` calls replaced — services are clock-testable |
 | **pageSize cap** | All paginated endpoints capped at 100 records per page |
-| **Quiz security fixes** | `QuizAttemptService.GetByIdAsync` scoped to current user; `SubmitAsync` validates each option belongs to its question |
-| **SearchService** | Type parameter validated; JSON content filtering pushed to the DB via `EF.Functions.Like` |
+| **Quiz security fixes** | `QuizAttemptService.GetByIdAsync` scoped to current user; `SubmitAsync` validates each option belongs to its question; `QuizAttempt` entity now carries `TenantId` for direct row-level isolation |
+| **Cross-quiz score manipulation fix** | `SubmitAsync` pre-loads valid question/option ID sets for the quiz; any answer referencing a foreign question or option throws 422 before scoring |
+| **SearchService** | Type parameter validated; JSONB content search uses `.Contains()` which EF Core translates with properly-escaped parameters (fixes LIKE wildcard injection via `%` / `_` in query strings) |
+| **Global EF query filters** | `DailyNotesDbContext` injects `IHttpContextAccessor` and applies `WHERE tenant_id = @current` automatically to 13 multi-tenant entities; bypassed when no HTTP context (migrations, background jobs) |
+| **CancellationToken propagation** | All 15 service interfaces and implementations accept `CancellationToken ct = default`; all EF Core async calls thread it through; controllers forward `HttpContext.RequestAborted` |
+| **Missing indexes** | Added composite `(tenant_id, user_id)` indexes on `work_days`, `work_notes`, `work_tasks`, `pay_periods`, `topic_notes`, `assignments`, `quiz_attempts` — eliminates full sequential scans on tenant-scoped list queries |
+| **Auth exception propagation** | Removed broad `catch (Exception ex)` blocks from `AuthController`; `DomainException` and infrastructure errors now reach the global handler correctly instead of being swallowed as 400/401 |
+| **UnauthorizedAccessException → 401** | Global exception handler maps `UnauthorizedAccessException` (thrown by `HttpTenantContext` for missing claims) to 401 instead of 500 |
+| **page=0 crash guard** | `WorkDayService.GetAllAsync` adds `page = Math.Max(1, page)` before `Skip()` to prevent `ArgumentOutOfRangeException` on `page=0` |
+| **CORS config-based origins** | Allowed origins read from `Cors:AllowedOrigins` config key; falls back to localhost dev addresses when not set |
+| **Unauthenticated request test** | `GetAll_Unauthenticated_Returns401` added to verify `[Authorize]` is enforced |
 | **Provider stubs registered** | `NullEmailProvider`, `NullFileStorageProvider`, `NullAiVisionProvider`, `NullSpeechProvider` registered in DI — ready to swap for real implementations |
 | **Transaction management** | `WorkNoteService.CreateAsync` (WorkDay auto-create) and `QuizAttemptService.SubmitAsync` (scoring) wrapped in DB transactions |
 | **TopicNote security fix** | `GET /api/topics/{id}/notes` now correctly scopes TopicNotes by tenant + user |
@@ -101,9 +112,11 @@
 | **OpenTelemetry** | Add structured logging (Serilog/structured), distributed tracing, and metrics via `OpenTelemetry.Extensions.Hosting`; export to Seq, Grafana, or Azure Monitor |
 | **Role-based authorization** | Enforce the `role` JWT claim — currently present but never checked; add `[Authorize(Roles = "owner")]` guards for destructive or admin-only operations |
 | **Refresh token expiry** | Add `ExpiresAt` to the refresh token record in `asp_net_user_tokens`; reject expired tokens and clean up stale rows |
+| **Webhook secret hashing** | `webhook_subscriptions.Secret` is stored as plaintext; hash with HMAC-SHA256 on write, return raw value once at creation, verify by hashing on comparison |
 | **Optimistic concurrency** | Add `RowVersion` / `ConcurrencyToken` to frequently-edited entities (`WorkNote`, `WorkTask`, `WorkDay`) and return `ETag` headers so concurrent edits fail fast |
 | **Background jobs** | Webhook delivery, email digests, and integration sync need a background processor (Hangfire or Quartz.NET); currently nothing runs outside the request lifecycle |
 | **Unit tests** | `IDailyNotesDataContext` is now an interface — add unit tests for service logic using a mock/fake data context, separate from the existing integration tests |
+| **Testcontainers** | Replace InMemory test DB with a real Postgres container for tests that exercise pgvector, JSONB queries, and FK constraints |
 | **Database resilience** | Add EF Core retry policy for transient Postgres failures: `options.UseNpgsql(conn, o => o.EnableRetryOnFailure(3))` |
 | **Rate limiting expansion** | Currently only auth endpoints are rate-limited; extend to all write endpoints to prevent abuse |
 | **Response caching** | Add `IMemoryCache` or Redis for frequently-read, rarely-changing data (tags list, topics tree, quiz questions) |

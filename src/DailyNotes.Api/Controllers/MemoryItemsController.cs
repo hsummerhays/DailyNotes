@@ -23,14 +23,14 @@ namespace DailyNotes.Api.Controllers
         /// <summary>Retrieves all memory items belonging to the current user/tenant.</summary>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<MemoryItem>>> GetAll()
-            => Ok(await _service.GetAllAsync());
+            => Ok(await _service.GetAllAsync(ct: HttpContext.RequestAborted));
 
         /// <summary>Retrieves a specific memory item by its ID.</summary>
         /// <param name="id">The unique ID of the memory item.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<MemoryItem>> GetById(int id)
         {
-            var item = await _service.GetByIdAsync(id);
+            var item = await _service.GetByIdAsync(id, ct: HttpContext.RequestAborted);
             if (item == null) return NotFound();
             return item;
         }
@@ -40,7 +40,7 @@ namespace DailyNotes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<MemoryItem>> Create(MemoryItemRequest request)
         {
-            var created = await _service.CreateAsync(request);
+            var created = await _service.CreateAsync(request, ct: HttpContext.RequestAborted);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
@@ -49,13 +49,13 @@ namespace DailyNotes.Api.Controllers
         /// <param name="request">The updated memory item data.</param>
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, MemoryItemRequest request)
-            => await _service.UpdateAsync(id, request) ? NoContent() : NotFound();
+            => await _service.UpdateAsync(id, request, ct: HttpContext.RequestAborted) ? NoContent() : NotFound();
 
         /// <summary>Deletes a memory item.</summary>
         /// <param name="id">The ID of the memory item to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
-            => await _service.DeleteAsync(id) ? NoContent() : NotFound();
+            => await _service.DeleteAsync(id, ct: HttpContext.RequestAborted) ? NoContent() : NotFound();
 
         /// <summary>Searches memory items using vector similarity.</summary>
         /// <param name="request">The search criteria including query embedding vector.</param>
@@ -68,7 +68,8 @@ namespace DailyNotes.Api.Controllers
                 request.MinConfidenceScore,
                 request.MemoryType,
                 request.MemoryStatus,
-                request.Limit);
+                request.Limit,
+                ct: HttpContext.RequestAborted);
             return Ok(results);
         }
     }

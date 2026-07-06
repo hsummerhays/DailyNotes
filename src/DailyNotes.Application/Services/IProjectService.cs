@@ -5,11 +5,11 @@ namespace DailyNotes.Application.Services
 {
     public interface IProjectService
     {
-        Task<IEnumerable<Project>> GetAllAsync();
-        Task<Project?> GetByIdAsync(int id);
-        Task<IEnumerable<WorkTask>?> GetProjectTasksAsync(int id);
-        Task<Project> CreateAsync(ProjectRequest request);
-        Task<bool> UpdateAsync(int id, ProjectRequest request);
-        Task<bool> DeleteAsync(int id);
+        Task<IEnumerable<Project>> GetAllAsync(CancellationToken ct = default);
+        Task<Project?> GetByIdAsync(int id, CancellationToken ct = default);
+        Task<IEnumerable<WorkTask>?> GetProjectTasksAsync(int id, CancellationToken ct = default);
+        Task<Project> CreateAsync(ProjectRequest request, CancellationToken ct = default);
+        Task<bool> UpdateAsync(int id, ProjectRequest request, CancellationToken ct = default);
+        Task<bool> DeleteAsync(int id, CancellationToken ct = default);
     }
 }

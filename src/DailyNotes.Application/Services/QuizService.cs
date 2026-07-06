@@ -10,31 +10,31 @@ namespace DailyNotes.Application.Services
     {
         public QuizService(IDailyNotesDataContext db, ITenantContext tc, TimeProvider clock) : base(db, tc, clock) { }
 
-        public async Task<IEnumerable<Quiz>> GetAllAsync(int? topicId, int? difficulty)
+        public async Task<IEnumerable<Quiz>> GetAllAsync(int? topicId, int? difficulty, CancellationToken ct = default)
         {
             var query = TenantOnlyScoped(_db.Quizzes).AsQueryable();
 
             if (topicId.HasValue) query = query.Where(q => q.TopicId == topicId.Value);
             if (difficulty.HasValue) query = query.Where(q => q.Difficulty == difficulty.Value);
 
-            return await query.OrderByDescending(q => q.CreatedAt).ToListAsync();
+            return await query.OrderByDescending(q => q.CreatedAt).ToListAsync(ct);
         }
 
-        public async Task<QuizDetailDto?> GetByIdAsync(int id)
+        public async Task<QuizDetailDto?> GetByIdAsync(int id, CancellationToken ct = default)
         {
-            var quiz = await TenantOnlyScoped(_db.Quizzes).FirstOrDefaultAsync(q => q.Id == id);
+            var quiz = await TenantOnlyScoped(_db.Quizzes).FirstOrDefaultAsync(q => q.Id == id, ct);
             if (quiz == null) return null;
 
             var questions = await _db.QuizQuestions
                 .Where(q => q.QuizId == id)
                 .OrderBy(q => q.SortOrder)
-                .ToListAsync();
+                .ToListAsync(ct);
 
             var questionIds = questions.Select(q => q.Id).ToList();
             var options = await _db.QuizOptions
                 .Where(o => questionIds.Contains(o.QuestionId))
                 .OrderBy(o => o.SortOrder)
-                .ToListAsync();
+                .ToListAsync(ct);
 
             return new QuizDetailDto
             {
@@ -47,7 +47,7 @@ namespace DailyNotes.Application.Services
             };
         }
 
-        public async Task<Quiz> CreateAsync(QuizRequest request)
+        public async Task<Quiz> CreateAsync(QuizRequest request, CancellationToken ct = default)
         {
             var quiz = new Quiz
             {
@@ -59,36 +59,36 @@ namespace DailyNotes.Application.Services
             };
 
             _db.Quizzes.Add(quiz);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             return quiz;
         }
 
-        public async Task<bool> UpdateAsync(int id, QuizRequest request)
+        public async Task<bool> UpdateAsync(int id, QuizRequest request, CancellationToken ct = default)
         {
-            var existing = await TenantOnlyScoped(_db.Quizzes).FirstOrDefaultAsync(q => q.Id == id);
+            var existing = await TenantOnlyScoped(_db.Quizzes).FirstOrDefaultAsync(q => q.Id == id, ct);
             if (existing == null) return false;
 
             existing.Title = request.Title;
             existing.TopicId = request.TopicId;
             existing.Difficulty = request.Difficulty;
 
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             return true;
         }
 
-        public async Task<bool> DeleteAsync(int id)
+        public async Task<bool> DeleteAsync(int id, CancellationToken ct = default)
         {
-            var quiz = await TenantOnlyScoped(_db.Quizzes).FirstOrDefaultAsync(q => q.Id == id);
+            var quiz = await TenantOnlyScoped(_db.Quizzes).FirstOrDefaultAsync(q => q.Id == id, ct);
             if (quiz == null) return false;
 
             _db.Quizzes.Remove(quiz);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             return true;
         }
 
-        public async Task<QuizQuestion?> AddQuestionAsync(int quizId, QuizQuestionRequest request)
+        public async Task<QuizQuestion?> AddQuestionAsync(int quizId, QuizQuestionRequest request, CancellationToken ct = default)
         {
-            var quiz = await TenantOnlyScoped(_db.Quizzes).FirstOrDefaultAsync(q => q.Id == quizId);
+            var quiz = await TenantOnlyScoped(_db.Quizzes).FirstOrDefaultAsync(q => q.Id == quizId, ct);
             if (quiz == null) return null;
 
             var question = new QuizQuestion
@@ -100,17 +100,17 @@ namespace DailyNotes.Application.Services
             };
 
             _db.QuizQuestions.Add(question);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             return question;
         }
 
-        public async Task<QuizOption?> AddOptionAsync(int questionId, QuizOptionRequest request)
+        public async Task<QuizOption?> AddOptionAsync(int questionId, QuizOptionRequest request, CancellationToken ct = default)
         {
-            var question = await _db.QuizQuestions.FindAsync(questionId);
+            var question = await _db.QuizQuestions.FindAsync(new object[] { questionId }, ct);
             if (question == null) return null;
 
             // Verify the quiz belongs to the current tenant
-            var quizAccessible = await TenantOnlyScoped(_db.Quizzes).AnyAsync(q => q.Id == question.QuizId);
+            var quizAccessible = await TenantOnlyScoped(_db.Quizzes).AnyAsync(q => q.Id == question.QuizId, ct);
             if (!quizAccessible) return null;
 
             var option = new QuizOption
@@ -122,7 +122,7 @@ namespace DailyNotes.Application.Services
             };
 
             _db.QuizOptions.Add(option);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             return option;
         }
     }

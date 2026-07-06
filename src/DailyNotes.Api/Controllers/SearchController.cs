@@ -34,8 +34,10 @@ namespace DailyNotes.Api.Controllers
         {
             if (string.IsNullOrWhiteSpace(q))
                 return BadRequest(new { message = "Search query 'q' is required." });
+            if (q.Length > 200)
+                return BadRequest(new { message = "Search query must be 200 characters or fewer." });
 
-            return Ok(await _service.SearchAsync(q, type, dateFrom, dateTo, projectId, statuses));
+            return Ok(await _service.SearchAsync(q, type, dateFrom, dateTo, projectId, statuses, ct: HttpContext.RequestAborted));
         }
     }
 }

@@ -21,14 +21,14 @@ namespace DailyNotes.Api.Controllers
         /// <summary>Retrieves all tags belonging to the current tenant.</summary>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Tag>>> GetAll()
-            => Ok(await _service.GetAllAsync());
+            => Ok(await _service.GetAllAsync(ct: HttpContext.RequestAborted));
 
         /// <summary>Retrieves a specific tag by its ID.</summary>
         /// <param name="id">The unique ID of the tag.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<Tag>> GetById(int id)
         {
-            var tag = await _service.GetByIdAsync(id);
+            var tag = await _service.GetByIdAsync(id, ct: HttpContext.RequestAborted);
             if (tag == null) return NotFound();
             return tag;
         }
@@ -38,7 +38,7 @@ namespace DailyNotes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<Tag>> Create(TagRequest request)
         {
-            var created = await _service.CreateAsync(request);
+            var created = await _service.CreateAsync(request, ct: HttpContext.RequestAborted);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
@@ -47,13 +47,13 @@ namespace DailyNotes.Api.Controllers
         /// <param name="request">The updated tag data.</param>
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, TagRequest request)
-            => await _service.UpdateAsync(id, request) ? NoContent() : NotFound();
+            => await _service.UpdateAsync(id, request, ct: HttpContext.RequestAborted) ? NoContent() : NotFound();
 
         /// <summary>Deletes a tag record.</summary>
         /// <param name="id">The ID of the tag to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
-            => await _service.DeleteAsync(id) ? NoContent() : NotFound();
+            => await _service.DeleteAsync(id, ct: HttpContext.RequestAborted) ? NoContent() : NotFound();
 
         /// <summary>Associates a tag with a specific item (e.g., a note or task).</summary>
         /// <param name="tagId">The ID of the tag.</param>
@@ -61,7 +61,7 @@ namespace DailyNotes.Api.Controllers
         [HttpPost("{tagId}/items")]
         public async Task<IActionResult> TagItem(int tagId, [FromBody] ItemTag itemTag)
         {
-            var result = await _service.TagItemAsync(tagId, itemTag);
+            var result = await _service.TagItemAsync(tagId, itemTag, ct: HttpContext.RequestAborted);
             if (result == null) return NotFound(new { message = "Tag not found." });
             return Ok(result);
         }
@@ -72,14 +72,14 @@ namespace DailyNotes.Api.Controllers
         /// <param name="itemId">The ID of the item.</param>
         [HttpDelete("{tagId}/items/{itemType}/{itemId}")]
         public async Task<IActionResult> UntagItem(int tagId, string itemType, int itemId)
-            => await _service.UntagItemAsync(tagId, itemType, itemId) ? NoContent() : NotFound();
+            => await _service.UntagItemAsync(tagId, itemType, itemId, ct: HttpContext.RequestAborted) ? NoContent() : NotFound();
 
         /// <summary>Retrieves all item associations for a specific tag.</summary>
         /// <param name="tagId">The ID of the tag.</param>
         [HttpGet("{tagId}/items")]
         public async Task<ActionResult<IEnumerable<ItemTag>>> GetTaggedItems(int tagId)
         {
-            var items = await _service.GetTaggedItemsAsync(tagId);
+            var items = await _service.GetTaggedItemsAsync(tagId, ct: HttpContext.RequestAborted);
             if (items == null) return NotFound(new { message = "Tag not found." });
             return Ok(items);
         }

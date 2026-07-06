@@ -20,6 +20,16 @@ namespace DailyNotes.Api.Tests
         }
 
         [Fact]
+        public async Task GetAll_Unauthenticated_Returns401()
+        {
+            var client = _factory.CreateClient();
+            // No X-User-Id / X-Tenant-Id headers — TestAuthHandler returns Fail
+
+            var resp = await client.GetAsync("/api/work-days");
+            Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+        }
+
+        [Fact]
         public async Task GetAll_ReturnsOnlyCurrentUserWorkDays()
         {
             var client = _factory.CreateClient();

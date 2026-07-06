@@ -21,14 +21,14 @@ namespace DailyNotes.Api.Controllers
         /// <summary>Retrieves all projects belonging to the current tenant.</summary>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Project>>> GetAll()
-            => Ok(await _service.GetAllAsync());
+            => Ok(await _service.GetAllAsync(ct: HttpContext.RequestAborted));
 
         /// <summary>Retrieves a specific project by its ID.</summary>
         /// <param name="id">The unique ID of the project.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<Project>> GetById(int id)
         {
-            var project = await _service.GetByIdAsync(id);
+            var project = await _service.GetByIdAsync(id, ct: HttpContext.RequestAborted);
             if (project == null) return NotFound();
             return project;
         }
@@ -38,7 +38,7 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("{id}/tasks")]
         public async Task<ActionResult<IEnumerable<WorkTask>>> GetProjectTasks(int id)
         {
-            var tasks = await _service.GetProjectTasksAsync(id);
+            var tasks = await _service.GetProjectTasksAsync(id, ct: HttpContext.RequestAborted);
             if (tasks == null) return NotFound();
             return Ok(tasks);
         }
@@ -48,7 +48,7 @@ namespace DailyNotes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<Project>> Create(ProjectRequest request)
         {
-            var created = await _service.CreateAsync(request);
+            var created = await _service.CreateAsync(request, ct: HttpContext.RequestAborted);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
@@ -57,12 +57,12 @@ namespace DailyNotes.Api.Controllers
         /// <param name="request">The updated project data.</param>
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, ProjectRequest request)
-            => await _service.UpdateAsync(id, request) ? NoContent() : NotFound();
+            => await _service.UpdateAsync(id, request, ct: HttpContext.RequestAborted) ? NoContent() : NotFound();
 
         /// <summary>Deletes a project and its associated metadata (tasks remain but are unlinked if handled by DB).</summary>
         /// <param name="id">The ID of the project to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
-            => await _service.DeleteAsync(id) ? NoContent() : NotFound();
+            => await _service.DeleteAsync(id, ct: HttpContext.RequestAborted) ? NoContent() : NotFound();
     }
 }

@@ -29,10 +29,14 @@ builder.Services.AddInfrastructureServices(builder.Configuration, builder.Enviro
 builder.Services.AddAuthConfiguration(builder.Configuration);
 
 // CORS
+var allowedOrigins = builder.Configuration["Cors:AllowedOrigins"]
+    ?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+    ?? ["http://localhost:5173", "http://localhost:4200"];
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowDevClient", policy =>
-        policy.WithOrigins("http://localhost:5173", "http://localhost:4200")
+        policy.WithOrigins(allowedOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials());
@@ -76,6 +80,11 @@ app.UseExceptionHandler(errorApp =>
             {
                 context.Response.StatusCode = domainEx.StatusCode;
                 await context.Response.WriteAsJsonAsync(new { message = domainEx.Message });
+            }
+            else if (error.Error is UnauthorizedAccessException)
+            {
+                context.Response.StatusCode = (int)HttpStatusCode.Unauthorized;
+                await context.Response.WriteAsJsonAsync(new { message = "Authentication required." });
             }
             else
             {

@@ -25,14 +25,14 @@ namespace DailyNotes.Api.Controllers
         public async Task<ActionResult<IEnumerable<TopicNote>>> GetAll(
             [FromQuery] int? topicId,
             [FromQuery] int? tagId)
-            => Ok(await _service.GetAllAsync(topicId, tagId));
+            => Ok(await _service.GetAllAsync(topicId, tagId, ct: HttpContext.RequestAborted));
 
         /// <summary>Retrieves a specific topic note by its ID.</summary>
         /// <param name="id">The unique ID of the topic note.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<TopicNote>> GetById(int id)
         {
-            var note = await _service.GetByIdAsync(id);
+            var note = await _service.GetByIdAsync(id, ct: HttpContext.RequestAborted);
             if (note == null) return NotFound();
             return note;
         }
@@ -42,7 +42,7 @@ namespace DailyNotes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<TopicNote>> Create(TopicNoteRequest request)
         {
-            var created = await _service.CreateAsync(request);
+            var created = await _service.CreateAsync(request, ct: HttpContext.RequestAborted);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
@@ -51,12 +51,12 @@ namespace DailyNotes.Api.Controllers
         /// <param name="request">The updated note content.</param>
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, TopicNoteRequest request)
-            => await _service.UpdateAsync(id, request) ? NoContent() : NotFound();
+            => await _service.UpdateAsync(id, request, ct: HttpContext.RequestAborted) ? NoContent() : NotFound();
 
         /// <summary>Deletes a topic note.</summary>
         /// <param name="id">The ID of the note to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
-            => await _service.DeleteAsync(id) ? NoContent() : NotFound();
+            => await _service.DeleteAsync(id, ct: HttpContext.RequestAborted) ? NoContent() : NotFound();
     }
 }

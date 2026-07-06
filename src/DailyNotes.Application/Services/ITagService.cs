@@ -5,13 +5,13 @@ namespace DailyNotes.Application.Services
 {
     public interface ITagService
     {
-        Task<IEnumerable<Tag>> GetAllAsync();
-        Task<Tag?> GetByIdAsync(int id);
-        Task<Tag> CreateAsync(TagRequest request);
-        Task<bool> UpdateAsync(int id, TagRequest request);
-        Task<bool> DeleteAsync(int id);
-        Task<ItemTag?> TagItemAsync(int tagId, ItemTag itemTag);
-        Task<bool> UntagItemAsync(int tagId, string itemType, int itemId);
-        Task<IEnumerable<ItemTag>?> GetTaggedItemsAsync(int tagId);
+        Task<IEnumerable<Tag>> GetAllAsync(CancellationToken ct = default);
+        Task<Tag?> GetByIdAsync(int id, CancellationToken ct = default);
+        Task<Tag> CreateAsync(TagRequest request, CancellationToken ct = default);
+        Task<bool> UpdateAsync(int id, TagRequest request, CancellationToken ct = default);
+        Task<bool> DeleteAsync(int id, CancellationToken ct = default);
+        Task<ItemTag?> TagItemAsync(int tagId, ItemTag itemTag, CancellationToken ct = default);
+        Task<bool> UntagItemAsync(int tagId, string itemType, int itemId, CancellationToken ct = default);
+        Task<IEnumerable<ItemTag>?> GetTaggedItemsAsync(int tagId, CancellationToken ct = default);
     }
 }

@@ -32,7 +32,7 @@ See [docs/architecture.md](docs/architecture.md) for the full layer breakdown, s
 ## Architecture Principles
 
 **Multi-Tenant by Default**
-Every entity carries `TenantId`. Most also carry `UserId`. `ApplicationServiceBase` provides `TenantScoped<T>` and `TenantOnlyScoped<T>` helpers that all services use — cross-tenant data access is structurally prevented.
+Every entity carries `TenantId`. Most also carry `UserId`. `ApplicationServiceBase` provides `TenantScoped<T>` and `TenantOnlyScoped<T>` helpers that all services use. As a second layer, `DailyNotesDbContext` applies EF Core global query filters (`HasQueryFilter`) to all 13 multi-tenant entities — a missed `TenantScoped` call in a service cannot leak data across tenants.
 
 **Clean Separation of Concerns**
 Domain entities and business rules live in `DailyNotes.Core` with no external dependencies. Controllers are 1–3 lines each. Services contain all use-case logic. Infrastructure is swappable.
@@ -55,6 +55,16 @@ Containerized and runnable locally via Docker or against a standalone Postgres i
 | Tests | xUnit, WebApplicationFactory, InMemory DB |
 
 ## Getting Started
+
+### Configuration (.env)
+
+The application relies on environment variables for configuration and secrets. A template/default [.env](file:///c:/HughApps/DailyNotes/.env) file is located in the root directory.
+
+* **ConnectionStrings__DefaultConnection**: Connection string for the PostgreSQL database (defaults to `localhost` for local run, overridden in `docker-compose.yml` to `postgres` container).
+* **Jwt__Key**: Secret key used to sign and validate JWT tokens.
+* **IMPORT_USER_PASSWORD**: Default password for the user seeded by the Import tool.
+
+The `.env` file is automatically parsed and loaded at runtime by the API and Import tools during local development.
 
 Helper scripts are provided for Windows (PowerShell) and Mac/Linux (Bash).
 
@@ -117,9 +127,11 @@ docker-compose.yml      # Local dev stack
 | **Observability** | Structured logging (Serilog) + OpenTelemetry traces and metrics; export to Seq or Azure Monitor |
 | **Role enforcement** | `role` claim is in the JWT but never checked — add `[Authorize(Roles = "owner")]` guards on admin/destructive endpoints |
 | **Refresh token expiry** | Add `ExpiresAt` to token store; reject and clean up stale refresh tokens |
+| **Webhook secret hashing** | Secrets stored in plaintext; hash with HMAC-SHA256 and return raw value once at creation |
 | **Background jobs** | Webhook delivery and email digests need an out-of-request processor (Hangfire or Quartz.NET) |
 | **Unit tests** | `IDailyNotesDataContext` is an interface — add unit tests with a mock context alongside the existing integration tests |
-| **Full-text search** | Upgrade `SearchService` from `EF.Functions.Like` to `tsvector` GIN index queries (schema is already prepared) |
+| **Testcontainers** | Replace InMemory test DB with real Postgres for tests covering pgvector, JSONB, and FK constraints |
+| **Full-text search** | Upgrade `SearchService` from `.Contains()` to `tsvector` GIN index queries (schema is already prepared) |
 | **Optimistic concurrency** | Add `RowVersion` to frequently-edited entities and return `ETag` headers |
 | **FluentValidation** | Replace DataAnnotations on request DTOs with `AbstractValidator<T>` classes for richer error responses |
 

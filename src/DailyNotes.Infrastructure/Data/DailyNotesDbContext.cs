@@ -1,7 +1,10 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using DailyNotes.Core.Entities;
+using DailyNotes.Core.Interfaces;
 using DailyNotes.Application.Data;
+using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
@@ -10,10 +13,25 @@ namespace DailyNotes.Infrastructure.Data
 {
     public class DailyNotesDbContext : IdentityDbContext, IDailyNotesDataContext
     {
-        public DailyNotesDbContext(DbContextOptions<DailyNotesDbContext> options)
+        private readonly IHttpContextAccessor? _httpContextAccessor;
+
+        public DailyNotesDbContext(DbContextOptions<DailyNotesDbContext> options, IHttpContextAccessor? httpContextAccessor = null)
             : base(options)
         {
+            _httpContextAccessor = httpContextAccessor;
         }
+
+        private int? CurrentTenantId
+        {
+            get
+            {
+                var claim = _httpContextAccessor?.HttpContext?.User?.FindFirstValue("tenant_id");
+                return int.TryParse(claim, out var id) ? id : null;
+            }
+        }
+
+        private void ApplyTenantFilter<T>(ModelBuilder builder) where T : class, IHasTenant
+            => builder.Entity<T>().HasQueryFilter(e => CurrentTenantId == null || e.TenantId == CurrentTenantId);
 
         public DbSet<Tenant> Tenants { get; set; } = null!;
         public DbSet<TenantUser> TenantUsers { get; set; } = null!;
@@ -46,6 +64,22 @@ namespace DailyNotes.Infrastructure.Data
             base.OnModelCreating(builder);
 
             builder.HasPostgresExtension("vector");
+
+            // Global tenant isolation filters — bypassed automatically when no HTTP context
+            // (migrations, background jobs, tests that call IgnoreQueryFilters())
+            ApplyTenantFilter<WorkDay>(builder);
+            ApplyTenantFilter<WorkNote>(builder);
+            ApplyTenantFilter<WorkTask>(builder);
+            ApplyTenantFilter<Topic>(builder);
+            ApplyTenantFilter<TopicNote>(builder);
+            ApplyTenantFilter<Course>(builder);
+            ApplyTenantFilter<Assignment>(builder);
+            ApplyTenantFilter<Project>(builder);
+            ApplyTenantFilter<PayPeriod>(builder);
+            ApplyTenantFilter<Quiz>(builder);
+            ApplyTenantFilter<Tag>(builder);
+            ApplyTenantFilter<MemoryItem>(builder);
+            ApplyTenantFilter<QuizAttempt>(builder);
 
             // Tenant User key
             builder.Entity<TenantUser>()
@@ -134,8 +168,19 @@ namespace DailyNotes.Infrastructure.Data
             builder.Entity<Topic>().HasIndex(t => t.TenantId);
             builder.Entity<Topic>().HasIndex(t => t.ParentTopicId);
             builder.Entity<TopicNote>().HasIndex(tn => tn.TopicId);
+            builder.Entity<TopicNote>().HasIndex(tn => new { tn.TenantId, tn.UserId });
             builder.Entity<Course>().HasIndex(c => c.TenantId);
             builder.Entity<Assignment>().HasIndex(a => a.CourseId);
+            builder.Entity<Assignment>().HasIndex(a => new { a.TenantId, a.UserId });
+
+            // Missing composite indexes on high-traffic tenant-scoped tables
+            builder.Entity<WorkDay>().HasIndex(w => new { w.TenantId, w.UserId });
+            builder.Entity<WorkNote>().HasIndex(n => new { n.TenantId, n.UserId });
+            builder.Entity<WorkTask>().HasIndex(t => new { t.TenantId, t.UserId });
+            builder.Entity<PayPeriod>().HasIndex(p => new { p.TenantId, p.UserId });
+
+            // QuizAttempt tenant scoping
+            builder.Entity<QuizAttempt>().HasIndex(a => new { a.TenantId, a.UserId });
 
             // Integration entities
             builder.Entity<IntegrationConnection>().ToTable("integration_connections");

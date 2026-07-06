@@ -25,14 +25,14 @@ namespace DailyNotes.Api.Controllers
         public async Task<ActionResult<IEnumerable<Attachment>>> GetAll(
             [FromQuery] string? itemType,
             [FromQuery] int? itemId)
-            => Ok(await _service.GetAllAsync(itemType, itemId));
+            => Ok(await _service.GetAllAsync(itemType, itemId, ct: HttpContext.RequestAborted));
 
         /// <summary>Retrieves a specific attachment by its ID.</summary>
         /// <param name="id">The unique ID of the attachment.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<Attachment>> GetById(int id)
         {
-            var attachment = await _service.GetByIdAsync(id);
+            var attachment = await _service.GetByIdAsync(id, ct: HttpContext.RequestAborted);
             if (attachment == null) return NotFound();
             return attachment;
         }
@@ -42,7 +42,7 @@ namespace DailyNotes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<Attachment>> Create(AttachmentRequest request)
         {
-            var created = await _service.CreateAsync(request);
+            var created = await _service.CreateAsync(request, ct: HttpContext.RequestAborted);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
@@ -50,6 +50,6 @@ namespace DailyNotes.Api.Controllers
         /// <param name="id">The ID of the attachment to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
-            => await _service.DeleteAsync(id) ? NoContent() : NotFound();
+            => await _service.DeleteAsync(id, ct: HttpContext.RequestAborted) ? NoContent() : NotFound();
     }
 }

@@ -22,14 +22,14 @@ namespace DailyNotes.Api.Controllers
         /// <param name="semester">Filter courses by a specific semester (e.g., 'Spring 2026').</param>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Course>>> GetAll([FromQuery] string? semester)
-            => Ok(await _service.GetAllAsync(semester));
+            => Ok(await _service.GetAllAsync(semester, ct: HttpContext.RequestAborted));
 
         /// <summary>Retrieves a specific course by its ID, including its associated assignments.</summary>
         /// <param name="id">The unique ID of the course.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<Course>> GetById(int id)
         {
-            var course = await _service.GetByIdAsync(id);
+            var course = await _service.GetByIdAsync(id, ct: HttpContext.RequestAborted);
             if (course == null) return NotFound();
             return course;
         }
@@ -39,7 +39,7 @@ namespace DailyNotes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<Course>> Create(CourseRequest request)
         {
-            var created = await _service.CreateAsync(request);
+            var created = await _service.CreateAsync(request, ct: HttpContext.RequestAborted);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
@@ -48,12 +48,12 @@ namespace DailyNotes.Api.Controllers
         /// <param name="request">The updated course data.</param>
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, CourseRequest request)
-            => await _service.UpdateAsync(id, request) ? NoContent() : NotFound();
+            => await _service.UpdateAsync(id, request, ct: HttpContext.RequestAborted) ? NoContent() : NotFound();
 
         /// <summary>Deletes a course record.</summary>
         /// <param name="id">The ID of the course to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
-            => await _service.DeleteAsync(id) ? NoContent() : NotFound();
+            => await _service.DeleteAsync(id, ct: HttpContext.RequestAborted) ? NoContent() : NotFound();
     }
 }

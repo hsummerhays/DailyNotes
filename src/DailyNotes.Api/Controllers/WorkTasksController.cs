@@ -25,19 +25,19 @@ namespace DailyNotes.Api.Controllers
         public async Task<ActionResult<IEnumerable<WorkTask>>> GetAll(
             [FromQuery] string? status,
             [FromQuery] int? projectId)
-            => Ok(await _service.GetAllAsync(status, projectId));
+            => Ok(await _service.GetAllAsync(status, projectId, ct: HttpContext.RequestAborted));
 
         /// <summary>Retrieves all overdue work tasks (due date in the past and not completed).</summary>
         [HttpGet("overdue")]
         public async Task<ActionResult<IEnumerable<WorkTask>>> GetOverdue()
-            => Ok(await _service.GetOverdueAsync());
+            => Ok(await _service.GetOverdueAsync(ct: HttpContext.RequestAborted));
 
         /// <summary>Retrieves a specific work task by its ID.</summary>
         /// <param name="id">The unique ID of the task.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<WorkTask>> GetById(int id)
         {
-            var task = await _service.GetByIdAsync(id);
+            var task = await _service.GetByIdAsync(id, ct: HttpContext.RequestAborted);
             if (task == null) return NotFound();
             return task;
         }
@@ -50,7 +50,7 @@ namespace DailyNotes.Api.Controllers
             if (request.ProjectId == null)
                 return BadRequest(new { message = "A linked project is required." });
 
-            var created = await _service.CreateAsync(request);
+            var created = await _service.CreateAsync(request, ct: HttpContext.RequestAborted);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
@@ -59,12 +59,12 @@ namespace DailyNotes.Api.Controllers
         /// <param name="request">The updated task content.</param>
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, WorkTaskRequest request)
-            => await _service.UpdateAsync(id, request) ? NoContent() : NotFound();
+            => await _service.UpdateAsync(id, request, ct: HttpContext.RequestAborted) ? NoContent() : NotFound();
 
         /// <summary>Deletes a work task.</summary>
         /// <param name="id">The ID of the task to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
-            => await _service.DeleteAsync(id) ? NoContent() : NotFound();
+            => await _service.DeleteAsync(id, ct: HttpContext.RequestAborted) ? NoContent() : NotFound();
     }
 }

@@ -18,13 +18,13 @@ namespace DailyNotes.Application.Services
         {
         }
 
-        public async Task<IEnumerable<MemoryItem>> GetAllAsync()
-            => await TenantScoped(_db.MemoryItems).OrderByDescending(m => m.CreatedAt).ToListAsync();
+        public async Task<IEnumerable<MemoryItem>> GetAllAsync(CancellationToken ct = default)
+            => await TenantScoped(_db.MemoryItems).OrderByDescending(m => m.CreatedAt).ToListAsync(ct);
 
-        public async Task<MemoryItem?> GetByIdAsync(int id)
-            => await TenantScoped(_db.MemoryItems).FirstOrDefaultAsync(m => m.Id == id);
+        public async Task<MemoryItem?> GetByIdAsync(int id, CancellationToken ct = default)
+            => await TenantScoped(_db.MemoryItems).FirstOrDefaultAsync(m => m.Id == id, ct);
 
-        public async Task<MemoryItem> CreateAsync(MemoryItemRequest request)
+        public async Task<MemoryItem> CreateAsync(MemoryItemRequest request, CancellationToken ct = default)
         {
             ValidateEmbeddingDimensions(request.Embedding);
 
@@ -49,15 +49,15 @@ namespace DailyNotes.Application.Services
             };
 
             _db.MemoryItems.Add(item);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             return item;
         }
 
-        public async Task<bool> UpdateAsync(int id, MemoryItemRequest request)
+        public async Task<bool> UpdateAsync(int id, MemoryItemRequest request, CancellationToken ct = default)
         {
             ValidateEmbeddingDimensions(request.Embedding);
 
-            var existing = await TenantScoped(_db.MemoryItems).FirstOrDefaultAsync(m => m.Id == id);
+            var existing = await TenantScoped(_db.MemoryItems).FirstOrDefaultAsync(m => m.Id == id, ct);
             if (existing == null) return false;
 
             existing.MemoryType = request.MemoryType;
@@ -73,17 +73,17 @@ namespace DailyNotes.Application.Services
             existing.SourceEntityId = request.SourceEntityId;
             existing.SourceExcerpt = request.SourceExcerpt;
 
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             return true;
         }
 
-        public async Task<bool> DeleteAsync(int id)
+        public async Task<bool> DeleteAsync(int id, CancellationToken ct = default)
         {
-            var item = await TenantScoped(_db.MemoryItems).FirstOrDefaultAsync(m => m.Id == id);
+            var item = await TenantScoped(_db.MemoryItems).FirstOrDefaultAsync(m => m.Id == id, ct);
             if (item == null) return false;
 
             _db.MemoryItems.Remove(item);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             return true;
         }
 
@@ -93,7 +93,8 @@ namespace DailyNotes.Application.Services
             double minConfidenceScore = 0.0,
             string? memoryType = null,
             string? memoryStatus = "Active",
-            int limit = 5)
+            int limit = 5,
+            CancellationToken ct = default)
         {
             if (queryEmbedding == null || queryEmbedding.Length == 0)
             {
@@ -129,7 +130,7 @@ namespace DailyNotes.Application.Services
                     query = query.Where(m => m.MemoryStatus == memoryStatus);
                 }
 
-                items = await query.ToListAsync();
+                items = await query.ToListAsync(ct);
             }
             else
             {
@@ -171,7 +172,7 @@ namespace DailyNotes.Application.Services
                 parameters.Add(new Vector(queryEmbedding));
                 parameters.Add(limitCandidates);
 
-                items = await _db.MemoryItems.FromSqlRaw(sql, parameters.ToArray()).ToListAsync();
+                items = await _db.MemoryItems.FromSqlRaw(sql, parameters.ToArray()).ToListAsync(ct);
             }
 
             var now = _clock.GetUtcNow().UtcDateTime;
@@ -220,7 +221,7 @@ namespace DailyNotes.Application.Services
             // Save the updated access times and counts
             if (results.Any())
             {
-                await _db.SaveChangesAsync();
+                await _db.SaveChangesAsync(ct);
             }
 
             return results;

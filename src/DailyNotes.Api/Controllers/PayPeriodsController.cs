@@ -22,14 +22,14 @@ namespace DailyNotes.Api.Controllers
         /// <param name="date">Filter to find the pay period that includes this date.</param>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<PayPeriod>>> GetAll([FromQuery] DateOnly? date)
-            => Ok(await _service.GetAllAsync(date));
+            => Ok(await _service.GetAllAsync(date, ct: HttpContext.RequestAborted));
 
         /// <summary>Retrieves a specific pay period by its ID.</summary>
         /// <param name="id">The unique ID of the pay period.</param>
         [HttpGet("{id}")]
         public async Task<ActionResult<PayPeriod>> GetById(int id)
         {
-            var period = await _service.GetByIdAsync(id);
+            var period = await _service.GetByIdAsync(id, ct: HttpContext.RequestAborted);
             if (period == null) return NotFound();
             return period;
         }
@@ -39,7 +39,7 @@ namespace DailyNotes.Api.Controllers
         [HttpGet("{id}/work-days")]
         public async Task<ActionResult<IEnumerable<WorkDay>>> GetPayPeriodWorkDays(int id)
         {
-            var workDays = await _service.GetWorkDaysAsync(id);
+            var workDays = await _service.GetWorkDaysAsync(id, ct: HttpContext.RequestAborted);
             if (workDays == null) return NotFound();
             return Ok(workDays);
         }
@@ -49,7 +49,7 @@ namespace DailyNotes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<PayPeriod>> Create(PayPeriodRequest request)
         {
-            var created = await _service.CreateAsync(request);
+            var created = await _service.CreateAsync(request, ct: HttpContext.RequestAborted);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
@@ -58,12 +58,12 @@ namespace DailyNotes.Api.Controllers
         /// <param name="request">The updated pay period data.</param>
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, PayPeriodRequest request)
-            => await _service.UpdateAsync(id, request) ? NoContent() : NotFound();
+            => await _service.UpdateAsync(id, request, ct: HttpContext.RequestAborted) ? NoContent() : NotFound();
 
         /// <summary>Deletes a pay period record.</summary>
         /// <param name="id">The ID of the pay period to delete.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
-            => await _service.DeleteAsync(id) ? NoContent() : NotFound();
+            => await _service.DeleteAsync(id, ct: HttpContext.RequestAborted) ? NoContent() : NotFound();
     }
 }

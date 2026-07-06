@@ -9,20 +9,20 @@ namespace DailyNotes.Application.Services
     {
         public AttachmentService(IDailyNotesDataContext db, ITenantContext tc, TimeProvider clock) : base(db, tc, clock) { }
 
-        public async Task<IEnumerable<Attachment>> GetAllAsync(string? itemType, int? itemId)
+        public async Task<IEnumerable<Attachment>> GetAllAsync(string? itemType, int? itemId, CancellationToken ct = default)
         {
             var query = TenantScoped(_db.Attachments).AsQueryable();
 
             if (!string.IsNullOrEmpty(itemType)) query = query.Where(a => a.ItemType == itemType);
             if (itemId.HasValue) query = query.Where(a => a.ItemId == itemId.Value);
 
-            return await query.OrderByDescending(a => a.CreatedAt).ToListAsync();
+            return await query.OrderByDescending(a => a.CreatedAt).ToListAsync(ct);
         }
 
-        public async Task<Attachment?> GetByIdAsync(int id)
-            => await TenantScoped(_db.Attachments).FirstOrDefaultAsync(a => a.Id == id);
+        public async Task<Attachment?> GetByIdAsync(int id, CancellationToken ct = default)
+            => await TenantScoped(_db.Attachments).FirstOrDefaultAsync(a => a.Id == id, ct);
 
-        public async Task<Attachment> CreateAsync(AttachmentRequest request)
+        public async Task<Attachment> CreateAsync(AttachmentRequest request, CancellationToken ct = default)
         {
             var attachment = new Attachment
             {
@@ -43,17 +43,17 @@ namespace DailyNotes.Application.Services
             };
 
             _db.Attachments.Add(attachment);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             return attachment;
         }
 
-        public async Task<bool> DeleteAsync(int id)
+        public async Task<bool> DeleteAsync(int id, CancellationToken ct = default)
         {
-            var attachment = await TenantScoped(_db.Attachments).FirstOrDefaultAsync(a => a.Id == id);
+            var attachment = await TenantScoped(_db.Attachments).FirstOrDefaultAsync(a => a.Id == id, ct);
             if (attachment == null) return false;
 
             _db.Attachments.Remove(attachment);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             return true;
         }
     }

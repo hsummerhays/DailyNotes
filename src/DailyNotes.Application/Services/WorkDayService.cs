@@ -10,8 +10,9 @@ namespace DailyNotes.Application.Services
         public WorkDayService(IDailyNotesDataContext db, ITenantContext tc, TimeProvider clock) : base(db, tc, clock) { }
 
         public async Task<IEnumerable<WorkDay>> GetAllAsync(
-            DateOnly? date, DateOnly? from, DateOnly? to, bool all, int page, int pageSize)
+            DateOnly? date, DateOnly? from, DateOnly? to, bool all, int page, int pageSize, CancellationToken ct = default)
         {
+            page = Math.Max(1, page);
             pageSize = Math.Min(pageSize, 100);
             var query = TenantScoped(_db.WorkDays).AsQueryable();
 
@@ -37,23 +38,23 @@ namespace DailyNotes.Application.Services
                 .OrderByDescending(w => w.WorkDate)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
-                .ToListAsync();
+                .ToListAsync(ct);
         }
 
-        public async Task<WorkDay?> GetTodayAsync()
+        public async Task<WorkDay?> GetTodayAsync(CancellationToken ct = default)
         {
             var today = DateOnly.FromDateTime(_clock.GetUtcNow().UtcDateTime);
             return await TenantScoped(_db.WorkDays)
                 .Include(w => w.Notes)
-                .FirstOrDefaultAsync(w => w.WorkDate == today);
+                .FirstOrDefaultAsync(w => w.WorkDate == today, ct);
         }
 
-        public async Task<WorkDay?> GetByIdAsync(int id)
+        public async Task<WorkDay?> GetByIdAsync(int id, CancellationToken ct = default)
             => await TenantScoped(_db.WorkDays)
                 .Include(w => w.Notes)
-                .FirstOrDefaultAsync(w => w.Id == id);
+                .FirstOrDefaultAsync(w => w.Id == id, ct);
 
-        public async Task<WorkDay> CreateAsync(WorkDayRequest request)
+        public async Task<WorkDay> CreateAsync(WorkDayRequest request, CancellationToken ct = default)
         {
             var now = _clock.GetUtcNow().UtcDateTime;
             var workDay = new WorkDay
@@ -74,13 +75,13 @@ namespace DailyNotes.Application.Services
             };
 
             _db.WorkDays.Add(workDay);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             return workDay;
         }
 
-        public async Task<bool> UpdateAsync(int id, WorkDayRequest request)
+        public async Task<bool> UpdateAsync(int id, WorkDayRequest request, CancellationToken ct = default)
         {
-            var existing = await TenantScoped(_db.WorkDays).FirstOrDefaultAsync(w => w.Id == id);
+            var existing = await TenantScoped(_db.WorkDays).FirstOrDefaultAsync(w => w.Id == id, ct);
             if (existing == null) return false;
 
             existing.WorkDate = request.WorkDate;
@@ -94,17 +95,17 @@ namespace DailyNotes.Application.Services
             existing.Comments = request.Comments;
             existing.UpdatedAt = _clock.GetUtcNow().UtcDateTime;
 
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             return true;
         }
 
-        public async Task<bool> DeleteAsync(int id)
+        public async Task<bool> DeleteAsync(int id, CancellationToken ct = default)
         {
-            var workDay = await TenantScoped(_db.WorkDays).FirstOrDefaultAsync(w => w.Id == id);
+            var workDay = await TenantScoped(_db.WorkDays).FirstOrDefaultAsync(w => w.Id == id, ct);
             if (workDay == null) return false;
 
             _db.WorkDays.Remove(workDay);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             return true;
         }
     }

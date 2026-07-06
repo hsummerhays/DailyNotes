@@ -8,6 +8,7 @@ namespace DailyNotes.Application.Services
             DateTime? dateFrom,
             DateTime? dateTo,
             int? projectId,
-            string? statuses);
+            string? statuses,
+            CancellationToken ct = default);
     }
 }
