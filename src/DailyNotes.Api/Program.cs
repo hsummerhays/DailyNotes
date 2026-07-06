@@ -6,7 +6,10 @@ using DailyNotes.Api.Infrastructure;
 using DailyNotes.Application;
 using DailyNotes.Core.Exceptions;
 using DailyNotes.Infrastructure.Data;
+using DailyNotes.Infrastructure.Helpers;
 using Microsoft.AspNetCore.RateLimiting;
+
+EnvLoader.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 

@@ -17,6 +17,8 @@ using Microsoft.Extensions.DependencyInjection;
 // Usage: dotnet run --project src/DailyNotes.Import -- --csv-dir ./data
 // ───────────────────────────────────────────────────────────────────
 
+DailyNotes.Infrastructure.Helpers.EnvLoader.Load();
+
 string csvDir = "./dataImport";
 
 // Parse --csv-dir argument
@@ -92,7 +94,8 @@ var user = await userManager.FindByEmailAsync(userEmail);
 if (user == null)
 {
     user = new IdentityUser { UserName = userEmail, Email = userEmail, EmailConfirmed = true };
-    var result = await userManager.CreateAsync(user, "REPLACED_PASSWORD");
+    var importPassword = Environment.GetEnvironmentVariable("IMPORT_USER_PASSWORD") ?? "REPLACED_PASSWORD";
+    var result = await userManager.CreateAsync(user, importPassword);
     if (!result.Succeeded)
     {
         Console.ForegroundColor = ConsoleColor.Red;

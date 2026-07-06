@@ -16,6 +16,10 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
+# Ensure a clean state
+echo "Ensuring a clean state..."
+"$(dirname "$0")/stop.sh"
+
 if [ "$MODE" == "local" ]; then
     echo "Starting Postgres container..."
     docker-compose up -d postgres
