@@ -58,10 +58,10 @@ Containerized and runnable locally via Docker or against a standalone Postgres i
 
 ### Configuration (.env)
 
-The application relies on environment variables for configuration and secrets. A template/default [.env](file:///c:/HughApps/DailyNotes/.env) file is located in the root directory.
+The application relies on environment variables for configuration and secrets. A template file [.env.example](file:///c:/HughApps/DailyNotes/.env.example) is provided in the repository root. Copy it to `.env` to customize settings for local development.
 
 * **ConnectionStrings__DefaultConnection**: Connection string for the PostgreSQL database (defaults to `localhost` for local run, overridden in `docker-compose.yml` to `postgres` container).
-* **Jwt__Key**: Secret key used to sign and validate JWT tokens.
+* **Jwt__Key**: Secret key used to sign and validate JWT tokens (minimum 32 characters).
 * **IMPORT_USER_PASSWORD**: Default password for the user seeded by the Import tool.
 
 The `.env` file is automatically parsed and loaded at runtime by the API and Import tools during local development.
